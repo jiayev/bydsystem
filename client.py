@@ -50,7 +50,14 @@ def charging_detail(username):
 
 def charging_stations_inf():
     response = requests.get(f'{BASE_URL}/charging_stations_inf')
-    #一次输出的格式如：{'message': "('A', 'fast', 'occupied', '2', '')\n('B', 'fast', 'occupied', '1', '')\n('C', 'slow', 'occupied', '123', '')\n('D', 'slow', 'free', '', '')\n('E', 'slow', 'free', '', '')"}
+    #将回复消息用制表符修改，去除原有标点，输出为表格形式
+    print('Charging stations information:')
+    print('ID\tType\tStatus\tCharging\tWaiting\tOn Service')
+    for i in response.json()['message'].split('\n'):
+        print(i.replace('(', '').replace(')', '').replace(',', '\t').replace("'", ''))
+
+def get_bill(username):
+    response = requests.get(f'{BASE_URL}/get_bill', data={'username': username})
     print(response.json()['message'])
 
 # 启动充电桩
@@ -105,7 +112,10 @@ def main():
             if admin: print("You are an admin.")
         print("\nWelcome to the EV Charging System! Please select an option:")
         print("1. Register")
-        print("2. Login")
+        if username is None:
+            print("2. Login")
+        else:
+            print("2. Logout")
         print("3. Submit a charging request")
         print("4. View Charging Stations Usage")
         print("5. Exit")
@@ -113,6 +123,8 @@ def main():
             print("6. Start/Stop Charging Station")
             print("7. Get Waiting Cars List")
             print("8. Get Report")
+        if username is not None:
+            print("b. Check Bill")
 
 
         option = input("\nEnter option number: ")
@@ -125,15 +137,20 @@ def main():
             risadmin = input("Are you an admin? (y/n)")
             register(rusername,rpassword,risadmin)
         elif option == "2":
-            admin = False 
-            username = input('Enter username: ')
-            password = input('Enter password: ')
-            result = login(username, password)
-            #如果登录失败，则username为None
-            if result == 0:
+            if username is None:
+                admin = False 
+                username = input('Enter username: ')
+                password = input('Enter password: ')
+                result = login(username, password)
+                #如果登录失败，则username为None
+                if result == 0:
+                    username = None
+                if result == 2:
+                    admin = True
+            else:
                 username = None
-            if result == 2:
-                admin = True
+                admin = False
+                print("Logout successful.\n")
         elif option == "3":
             if username is None:
                 print("Please login first.")
@@ -180,6 +197,12 @@ def main():
                 print("You are not an admin.")
             else:
                 get_reports()
+
+        elif option == "b":
+            if username is None:
+                print("Please login first.")
+            else:
+                get_bill(username)
 
         else:
             print("Invalid option. Please enter a valid option number.")
