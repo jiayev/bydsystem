@@ -10,6 +10,9 @@ class WaitingNode:
     def print(self):
         print(self.car_id, self.charge_value, self.charge_mode)
 
+    def getInfo(self):
+        return self.car_id, self.charge_value, self.charge_mode
+
 class WaitingList:
     def __init__(self):
         self.head = None

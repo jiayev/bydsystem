@@ -3,6 +3,18 @@ import requests
 # 设置服务器的基础URL
 BASE_URL = 'http://localhost:5000'
 
+# 主文件中函数event_request(event_type,id,charge_type,value)
+
+def event_request(event_type,id,charge_type,value):
+    # 使用POST请求发送事件信息到服务器
+    response = requests.post(f'{BASE_URL}/event_request', json={'event_type': event_type, 'id': id, 'charge_type': charge_type, 'value': value})
+
+    # 返回服务器的响应
+    if response.status_code == 200:
+        print('Event request successful.')
+    else:
+        print('Event request failed.')
+        
 def register(username, password, isadmin):
     # 使用POST请求发送用户注册信息到服务器
     response = requests.post(f'{BASE_URL}/register', data={'username': username, 'password': password, 'isadmin': isadmin})
@@ -32,17 +44,17 @@ def login(username, password):
 charging_requests = {}
 
 
-def charging_request(vehicle_id, charging_mode, charging_volume):
-    response = requests.post(
-        f'{BASE_URL}/charging_request',
-        json={'vehicle_id': vehicle_id, 'charging_mode': charging_mode, 'charging_volume': charging_volume}
-    )
-    print(f'Response status: {response.status_code}')
-    print(f'Response content: {response.content}')
-    if response.status_code == 200:
-        print(response.json()['message'])
-    else:
-        print('Charging request failed.')
+# def charging_request(vehicle_id, charging_mode, charging_volume):
+#     response = requests.post(
+#         f'{BASE_URL}/charging_request',
+#         json={'vehicle_id': vehicle_id, 'charging_mode': charging_mode, 'charging_volume': charging_volume}
+#     )
+#     print(f'Response status: {response.status_code}')
+#     print(f'Response content: {response.content}')
+#     if response.status_code == 200:
+#         print(response.json()['message'])
+#     else:
+#         print('Charging request failed.')
 
 def charging_detail(username):
     response = requests.get(f'{BASE_URL}/charging_detail', data={'username': username})
@@ -88,7 +100,7 @@ def get_charger_status():
 def get_waiting_vehicles():
     response = requests.get(f'{BASE_URL}/waiting_vehicles')
     if response.status_code == 200:
-        print('Waiting vehicles:', response.json())
+        print('Waiting vehicles:\n', response.json())
     else:
         print('Failed to get waiting vehicles.')
 
@@ -158,7 +170,7 @@ def main():
                 vehicle_id = input('Enter your vehicle ID: ')
                 charging_mode = input('Enter charging mode (fast or slow): ')
                 charging_volume = float(input('Enter charging volume: '))
-                charging_request(vehicle_id, charging_mode, charging_volume)
+                event_request('A',vehicle_id, charging_mode, charging_volume)
         elif option == "4":
            # if username is None:
            #     print("Please login first.")
@@ -178,9 +190,9 @@ def main():
                 station_id = input('Enter station ID: ')
                 action = input('Enter action (start or stop): ')
                 if action == 'start':
-                    start_charger(station_id)
+                    event_request('B', station_id, 'O', 1)
                 elif action == 'stop':
-                    stop_charger(station_id)
+                    event_request('B', station_id, 'O', 0)
 
         elif option == "7":
             if username is None:

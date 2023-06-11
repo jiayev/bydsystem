@@ -5,7 +5,7 @@ import waitinglist
 from waitinglist import WaitingList
 from waitinglist import WaitingNode
 from sqlite3 import Error
-from flask import Flask, request
+from flask import Flask, request, g
 import threading
 from models import datetime
 import queue
@@ -41,6 +41,15 @@ def create_account_table():
 
     conn.commit()
     conn.close()
+@app.before_first_request
+def create_list():
+    g.wait_list = WaitingList()
+    print("Waiting list created.\n")
+@app.route('/')
+def index():
+    
+    return "Welcome to the charging station system.", 200
+
 @app.route('/register', methods=['POST'])
 def register_account():
     username = request.form.get('username')  # 使用request.form获取POST数据
@@ -97,28 +106,29 @@ def login():
 
 @app.route('/event_request', methods=['POST'])
 
-def turnStation(station_id,charge_type):
-    if charge_type == '1':
+def turnStation(station_id,value):
+    if value == '1':
         # 开启对应充电桩
 
         return "Charging station " + station_id + " is now available.", 200
-    elif charge_type == '0':
+    elif value == '0':
         # 关闭对应充电桩
 
         return "Charging station " + station_id + " is now unavailable.", 200
-def event_request(event_type,id,charge_type,value,wait_list):
+def event_request(event_type,id,charge_type,value):
     request_data = request.get_json()
     event_type = request_data['event_type']
     id = request_data['id']
     charge_type = request_data['charge_type']
     value = request_data['value']
+    wait_list = g.wait_list
     if event_type == 'A':
         if value != 0:
             WaitingList.add(wait_list,id,value,charge_type)
         else:
             WaitingList.remove(wait_list,id)
     elif event_type == 'B':
-            turnStation(id,charge_type)
+            turnStation(id,value)
     elif event_type == 'C':
             WaitingList.changeInfo(wait_list,id,value,charge_type)
 
@@ -233,6 +243,15 @@ def get_charging_cars():
         f'Car ID: {car_id}, Need charging volume: {info["need_charging_volume"]}, Charged volume: {info["charged_volume"]}, Charging mode: {info["charging_mode"]}'
         for car_id, info in charging_cars.items()
     ]
+@app.route('/waiting_vehicles', methods=['GET'])
+def waiting_vehicals():
+    wait_list = g.wait_list
+    request_data = ""
+    # 对g.wait_list中的每个WaitingNode元素使用函数WaitingNode.getInfo，返回self.car_id, self.charge_value, self.charge_mode，整合为一个字符串
+    for i in range(wait_list.getLength()):
+        request_data += WaitingNode.getInfo(wait_list[i])
+
+    return {"message": request_data}, 200
 
 @app.route('/charging_detail', methods=['GET'])
 def charging_detail():
@@ -308,10 +327,7 @@ def print_all_accounts():
 
 
 if __name__ == '__main__':
-
-    # 创建等待链表
-    wait_list = WaitingList()
-    print("Waiting list created.\n")
+   
     # WaitingList.add(wait_list, 'lv1', 12, 'F')
     # WaitingList.add(wait_list, 'lv2', 13, 'T')
     # wait_list.print()
