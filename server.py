@@ -95,7 +95,32 @@ def login():
         return "Invalid username or password.", 401  # 返回错误消息和 401 状态码
 
 
+@app.route('/event_request', methods=['POST'])
 
+def turnStation(station_id,charge_type):
+    if charge_type == '1':
+        # 开启对应充电桩
+
+        return "Charging station " + station_id + " is now available.", 200
+    elif charge_type == '0':
+        # 关闭对应充电桩
+
+        return "Charging station " + station_id + " is now unavailable.", 200
+def event_request(event_type,id,charge_type,value,wait_list):
+    request_data = request.get_json()
+    event_type = request_data['event_type']
+    id = request_data['id']
+    charge_type = request_data['charge_type']
+    value = request_data['value']
+    if event_type == 'A':
+        if value != 0:
+            WaitingList.add(wait_list,id,value,charge_type)
+        else:
+            WaitingList.remove(wait_list,id)
+    elif event_type == 'B':
+            turnStation(id,charge_type)
+    elif event_type == 'C':
+            WaitingList.changeInfo(wait_list,id,value,charge_type)
 
 @app.route('/charging_request', methods=['POST'])
 def charging_request():
@@ -237,7 +262,10 @@ def assign_charging_station(conn, car_id, charging_mode):
 
     return chosen_station
 
-
+@app.route('/get_bill', methods=['GET'])
+def get_bill(car_id):
+    # todo: 生成账单
+    return {"message": "Bill returned successfully."}, 200
 
 @app.route('/charging_stations_inf', methods=['GET'])
 #返回所有充电桩状态信息
