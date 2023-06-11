@@ -106,12 +106,12 @@ def login():
 
 @app.route('/event_request', methods=['POST'])
 
-def turnStation(station_id,charge_type):
-    if charge_type == '1':
+def turnStation(station_id,value):
+    if value == '1':
         # 开启对应充电桩
 
         return "Charging station " + station_id + " is now available.", 200
-    elif charge_type == '0':
+    elif value == '0':
         # 关闭对应充电桩
 
         return "Charging station " + station_id + " is now unavailable.", 200
@@ -128,7 +128,7 @@ def event_request(event_type,id,charge_type,value):
         else:
             WaitingList.remove(wait_list,id)
     elif event_type == 'B':
-            turnStation(id,charge_type)
+            turnStation(id,value)
     elif event_type == 'C':
             WaitingList.changeInfo(wait_list,id,value,charge_type)
 
