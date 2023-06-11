@@ -29,13 +29,12 @@ def display_charging_cars():
             print()
         time.sleep(5)  # 每5秒打印一次
 
-
 def create_account_table():
     conn = sqlite3.connect('accounts.db')
     c = conn.cursor()
 
     c.execute('''CREATE TABLE accounts
-                 (username text, password text)''')
+                 (username text, password text, isadmin boolean)''')
 
     conn.commit()
     conn.close()
@@ -43,11 +42,15 @@ def create_account_table():
 def register_account():
     username = request.form.get('username')  # 使用request.form获取POST数据
     password = request.form.get('password')
-
+    isadmin = request.form.get('isadmin')
     conn = sqlite3.connect('accounts.db')
+    # 如果数据库中不存在accounts表，则创建accounts表
+    if conn.execute("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='accounts'").fetchone()[0] == 0:
+        create_account_table()
+        print("accounts table created\n")
     c = conn.cursor()
 
-    c.execute("INSERT INTO accounts VALUES (?,?)", (username, password))
+    c.execute("INSERT INTO accounts VALUES (?,?,?)", (username, password,isadmin))
 
     conn.commit()
     conn.close()
@@ -56,25 +59,34 @@ def register_account():
 def check_account(username, password):
     conn = sqlite3.connect('accounts.db')
     c = conn.cursor()
-
     c.execute("SELECT * FROM accounts WHERE username=? AND password=?", (username, password))
+    # 根据得到的查询结果，判断是否为管理员账户
     result = c.fetchone()
-
     conn.close()
+    # 打印查询结果
+    print(result)
 
     if result is None:
-        return False
+        return 0
     else:
-        return True
+        if result[2] == 'y':
+            return 2
+        return 1
 
 
 @app.route('/login', methods=['POST'])
 
 def login():
+    isadmin = False
     username = request.form.get('username')  # 从请求中获取用户名
     password = request.form.get('password')  # 从请求中获取密码
-
-    if check_account(username, password):  # 如果 check_account 函数返回 True
+    # 调用check_account函数，检查用户名和密码是否正确
+    result = check_account(username, password)
+    if result == 2:
+        print("Login as ",username," an administrator.")
+        return "Login successful. You are an administrator.", 201  # 返回登录成功消息和 201 状态码
+    elif result == 1:
+        print("Login as ",username," a user.")
         return "Login successful.", 200  # 返回登录成功消息和 200 状态码
     else:  # 如果 check_account 函数返回 False
         return "Invalid username or password.", 401  # 返回错误消息和 401 状态码

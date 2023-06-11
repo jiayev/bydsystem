@@ -4,18 +4,20 @@ import requests
 BASE_URL = 'http://127.0.0.1:5000'
 
 # 注册管理员
-def register_admin(username, password):
-    response = requests.post(f'{BASE_URL}/register_admin', json={'username': username, 'password': password})
+def register_admin(username, password, isadmin):
+    response = requests.post(f'{BASE_URL}/register_admin', json={'username': username, 'password': password, 'isadmin': isadmin})
     if response.status_code == 200:
         print('Registration successful.')
     else:
         print('Registration failed.')
 
 # 管理员登录
-def login_admin(username, password):
-    response = requests.post(f'{BASE_URL}/login_admin', json={'username': username, 'password': password})
+def login_admin(username, password, isadmin):
+    response = requests.post(f'{BASE_URL}/login_admin', json={'username': username, 'password': password, 'isadmin': isadmin})
     if response.status_code == 200:
-        print('Login successful.')
+        if isadmin:
+            print('Login successful, admin.')
+        else: print('Login successful.')
     else:
         print('Login failed.')
 
@@ -37,9 +39,9 @@ def stop_charger(charger_id):
 
 # 查看所有充电桩状态
 def get_charger_status():
-    response = requests.get(f'{BASE_URL}/charger_status')
+    response = requests.get(f'{BASE_URL}/charging_stations_status')
     if response.status_code == 200:
-        print('Charger status:', response.json())
+        print('Charger status:\n', response.json())
     else:
         print('Failed to get charger status.')
 
