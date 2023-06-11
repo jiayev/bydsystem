@@ -284,11 +284,11 @@ if __name__ == '__main__':
     # 创建等待链表
     wait_list = WaitingList()
     print("Waiting list created.\n")
-    WaitingList.add(wait_list, 'lv1', 12, 'F')
-    WaitingList.add(wait_list, 'lv2', 13, 'T')
-    wait_list.print()
-    wait_list.getFirstFast().print()
-    wait_list.getFirstSlow().print()
+    # WaitingList.add(wait_list, 'lv1', 12, 'F')
+    # WaitingList.add(wait_list, 'lv2', 13, 'T')
+    # wait_list.print()
+    # wait_list.getFirstFast().print()
+    # wait_list.getFirstSlow().print()
     app.run(port=5000, debug=True)
    
     
