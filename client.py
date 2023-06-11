@@ -45,6 +45,12 @@ def charging_detail(username):
     response = requests.get(f'{BASE_URL}/charging_detail', data={'username': username})
     print(response.json())
 
+def charging_stations_inf():
+    response = requests.get(f'{BASE_URL}/charging_stations_inf')
+    #一次输出的格式如：{'message': "('A', 'fast', 'occupied', '2', '')\n('B', 'fast', 'occupied', '1', '')\n('C', 'slow', 'occupied', '123', '')\n('D', 'slow', 'free', '', '')\n('E', 'slow', 'free', '', '')"}
+    print(response.json()['message'])
+
+
 
 def main():
     username = None
@@ -53,7 +59,8 @@ def main():
         print("1. Register")
         print("2. Login")
         print("3. Submit a charging request")
-        print("4. Exit")
+        print("4. View Charging Stations Usage")
+        print("5. Exit")
 
         option = input("\nEnter option number: ")
 
@@ -74,6 +81,12 @@ def main():
                 charging_volume = float(input('Enter charging volume: '))
                 charging_request(vehicle_id, charging_mode, charging_volume)
         elif option == "4":
+           # if username is None:
+           #     print("Please login first.")
+            #else:
+                charging_stations_inf()
+                
+        elif option == "5":
             print("Exiting... Thank you!")
             break
         else:

@@ -223,9 +223,33 @@ def assign_charging_station(conn, car_id, charging_mode):
     return chosen_station
 
 
+
+@app.route('/charging_stations_inf', methods=['GET'])
+#返回所有充电桩状态信息
 def get_charging_stations():
-    # 需要一些逻辑来返回所有充电桩状态信息
-    return {"message": "Charging station information returned successfully."}, 200
+    # 连接到你的数据库
+    conn = sqlite3.connect('charging_stations.db')
+
+    # 创建一个Cursor对象
+    c = conn.cursor()
+
+    # 执行SQL查询来获取所有充电桩的状态
+    c.execute('SELECT * FROM charging_stations')
+
+    # 获取查询结果
+    result = c.fetchall()
+
+    # 关闭数据库连接
+    conn.close()
+
+    # 将查询结果转化为字符串，每次结果占一行
+    result_str = '\n'.join([str(row) for row in result])
+
+
+    # 返回查询结果
+    return {"message": result_str}, 200
+
+    
 
 def print_all_accounts():
     conn = sqlite3.connect('accounts.db')
