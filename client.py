@@ -88,7 +88,7 @@ def get_charger_status():
 def get_waiting_vehicles():
     response = requests.get(f'{BASE_URL}/waiting_vehicles')
     if response.status_code == 200:
-        print('Waiting vehicles:', response.json())
+        print('Waiting vehicles:\n', response.json())
     else:
         print('Failed to get waiting vehicles.')
 
