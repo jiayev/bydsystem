@@ -1,3 +1,4 @@
+# 本文件废弃，功能已整合到client.py中
 import requests
 
 # 服务器基础URL
