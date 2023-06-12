@@ -33,7 +33,16 @@ def update_charging_station(station_id, station_type, status, current_charging_c
     c.execute("UPDATE charging_stations SET station_type = ?, status = ?, current_charging_car = ?, charging_queue = ?, current_waiting_car = ?, on_service = ?  WHERE station_id = ?",  
               (station_type, status, current_charging_car, charging_queue, current_waiting_car, station_id, on_service))
     conn.commit()
-    conn.close()  
+    conn.close()
+
+# 充电站切换busy或free
+def switch_charging_station(station_id, status):
+    conn = sqlite3.connect('charging_stations.db')
+    c = conn.cursor()
+    c.execute("UPDATE charging_stations SET status = ? WHERE station_id = ?",  
+              (status, station_id))
+    conn.commit()
+    conn.close()
 
 # 开启或关闭充电站
 def turn_on_off_charging_station(station_id, on_service):

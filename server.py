@@ -248,6 +248,14 @@ def waiting_vehicals():
 
     return {"message": request_data}, 200
 
+def get_first_waiting_vehicle(charging_mode):
+    # 返回等待队列中的第一个车辆
+    wait_list = g.wait_list
+    if charging_mode == 'F':
+        return wait_list.getFirstFast().car_id
+    elif charging_mode == 'T':
+        return wait_list.getFirstSlow().car_id
+
 @app.route('/charging_detail', methods=['GET'])
 def charging_detail():
     username = request.form['username']
@@ -317,7 +325,8 @@ def print_all_accounts():
 
     conn.close()
 
-
+def switch_station_status(station_id, status):
+    op_sql.switch_charging_station(station_id, status)
 
 
 

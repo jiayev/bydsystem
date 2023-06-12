@@ -142,7 +142,7 @@ def main():
         if admin:
             print("6. Start/Stop Charging Station")
             print("7. Get Waiting Cars List")
-            print("8. Get Report")
+            print("8. Get Report [WIP]")
         if username is not None:
             print("b. Check Bill")
 
@@ -180,10 +180,10 @@ def main():
                 charging_volume = float(input('Enter charging volume: '))
                 event_request('A',vehicle_id, charging_mode, charging_volume)
         elif option == "4":
-           # if username is None:
-           #     print("Please login first.")
+            # if username is None:
+            #     print("Please login first.")
             #else:
-                charging_stations_inf()
+            charging_stations_inf()
                 
         elif option == "5":
             print("Exiting... Thank you!")
