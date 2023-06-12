@@ -3,11 +3,14 @@ import requests
 # 设置服务器的基础URL
 BASE_URL = 'http://localhost:5000'
 
+# 程序启动时请求一次服务器
+response = requests.get(f'{BASE_URL}/')
+
 # 主文件中函数event_request(event_type,id,charge_type,value)
 
 def event_request(event_type,id,charge_type,value):
     # 使用POST请求发送事件信息到服务器
-    response = requests.post(f'{BASE_URL}/event_request', json={'event_type': event_type, 'id': id, 'charge_type': charge_type, 'value': value})
+    response = requests.post(f'{BASE_URL}/event_request', data={'event_type': event_type, 'id': id, 'charge_type': charge_type, 'value': value})
 
     # 返回服务器的响应
     if response.status_code == 200:
@@ -74,15 +77,16 @@ def get_bill(username):
 
 # 启动充电桩
 def start_charger(charger_id):
-    response = requests.post(f'{BASE_URL}/start_charger', json={'charger_id': charger_id})
+    response = requests.post(f'{BASE_URL}/event_request', data={'event_type': 'B', 'id': charger_id, 'charge_type': 'O', 'value': 1})
     if response.status_code == 200:
         print('Charger started.')
     else:
         print('Charger start failed.')
 
 # 关闭充电桩
+# event_request(event_type,id,charge_type,value)
 def stop_charger(charger_id):
-    response = requests.post(f'{BASE_URL}/stop_charger', json={'charger_id': charger_id})
+    response = requests.post(f'{BASE_URL}/event_request', data={'event_type': 'B', 'id': charger_id, 'charge_type': 'O', 'value': 0})
     if response.status_code == 200:
         print('Charger stopped.')
     else:
@@ -117,6 +121,10 @@ def main():
     admin = False
     # 未登录或者登录的是非管理员账户时显示的菜单
     while True:
+        response = requests.get(f'{BASE_URL}/')
+        if response.status_code != 200:
+            print('Failed to connect to server.')
+            return
         print("\nCurrent Status:")
         if username is None: print("Not logged in.")
         else: 

@@ -16,7 +16,8 @@ def create_charging_stations_table():
          status TEXT,
          current_charging_car TEXT,
          charging_queue TEXT,
-         chrrent_waiting_car TEXT)
+         current_waiting_car TEXT,
+         on_service TEXT)
     ''')
 
         #事件表
@@ -75,14 +76,14 @@ def create_charging_stations_table():
     ''')
 
     # 初始插入充电桩数据，其中 station_id 是唯一的，分别为 A, B, C, D, E
-    stations = [("A", "fast", "free", "", "", ""),
-                ("B", "fast", "free", "", "", ""),
-                ("C", "slow", "free", "", "", ""),
-                ("D", "slow", "free", "", "", ""),
-                ("E", "slow", "free", "", "", "")]
+    stations = [("A", "fast", "free", "", "", "", "1"),
+                ("B", "fast", "free", "", "", "", "1"),
+                ("C", "slow", "free", "", "", "", "1"),
+                ("D", "slow", "free", "", "", "", "1"),
+                ("E", "slow", "free", "", "", "", "1")]
 
     c.executemany('''
-        INSERT INTO charging_stations VALUES (?,?,?,?,?,?)
+        INSERT INTO charging_stations VALUES (?,?,?,?,?,?,?)
     ''', stations)
 
     # 提交事务

@@ -26,14 +26,31 @@ def delete_charging_station(station_id):
     conn.commit()
     conn.close()
 
-def update_charging_station(station_id, station_type, status, current_charging_car, charging_queue, current_waiting_car):
+def update_charging_station(station_id, station_type, status, current_charging_car, charging_queue, current_waiting_car, on_service):
     #这个更新station_id对应的列
     conn = sqlite3.connect('charging_stations.db')
     c = conn.cursor()
-    c.execute("UPDATE charging_stations SET station_type = ?, status = ?, current_charging_car = ?, charging_queue = ?, current_waiting_car = ?  WHERE station_id = ?",  
-              (station_type, status, current_charging_car, charging_queue, current_waiting_car, station_id))
+    c.execute("UPDATE charging_stations SET station_type = ?, status = ?, current_charging_car = ?, charging_queue = ?, current_waiting_car = ?, on_service = ?  WHERE station_id = ?",  
+              (station_type, status, current_charging_car, charging_queue, current_waiting_car, station_id, on_service))
     conn.commit()
     conn.close()  
+
+# 开启或关闭充电站
+def turn_on_off_charging_station(station_id, on_service):
+    conn = sqlite3.connect('charging_stations.db')
+    c = conn.cursor()
+    c.execute("UPDATE charging_stations SET on_service = ? WHERE station_id = ?",  
+              (on_service, station_id))
+    conn.commit()
+    conn.close()
+
+# 开启全部充电站
+def turn_on_all_charging_station():
+    conn = sqlite3.connect('charging_stations.db')
+    c = conn.cursor()
+    c.execute("UPDATE charging_stations SET on_service = '1'")
+    conn.commit()
+    conn.close()
 
 #---------------------------------------------------------------------------------------------------------------------------#
 

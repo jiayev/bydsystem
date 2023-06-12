@@ -9,6 +9,7 @@ from flask import Flask, request, g
 import threading
 from models import datetime
 import queue
+import op_sql
 
 # 创建两个队列，一个用于快充的请求，另一个用于慢充的请求
 fast_charging_queue = queue.Queue(maxsize=6)
@@ -42,13 +43,16 @@ def create_account_table():
     conn.commit()
     conn.close()
 @app.before_first_request
-def create_list():
+def setup():
     g.wait_list = WaitingList()
     print("Waiting list created.\n")
+    op_sql.turn_on_all_charging_station()
+    print("All charging stations are on.\n")
+
 @app.route('/')
 def index():
-    
-    return "Welcome to the charging station system.", 200
+    print("Client connected.\n")
+    return "Client connected.", 200
 
 @app.route('/register', methods=['POST'])
 def register_account():
@@ -105,22 +109,11 @@ def login():
 
 
 @app.route('/event_request', methods=['POST'])
-
-def turnStation(station_id,value):
-    if value == '1':
-        # 开启对应充电桩
-
-        return "Charging station " + station_id + " is now available.", 200
-    elif value == '0':
-        # 关闭对应充电桩
-
-        return "Charging station " + station_id + " is now unavailable.", 200
-def event_request(event_type,id,charge_type,value):
-    request_data = request.get_json()
-    event_type = request_data['event_type']
-    id = request_data['id']
-    charge_type = request_data['charge_type']
-    value = request_data['value']
+def event_request():
+    event_type = request.form.get('event_type')
+    id = request.form.get('id')
+    value = request.form.get('value')
+    charge_type = request.form.get('charge_type')
     wait_list = g.wait_list
     if event_type == 'A':
         if value != 0:
@@ -128,9 +121,11 @@ def event_request(event_type,id,charge_type,value):
         else:
             WaitingList.remove(wait_list,id)
     elif event_type == 'B':
-            turnStation(id,value)
+            op_sql.turn_on_off_charging_station(id,value)
     elif event_type == 'C':
             WaitingList.changeInfo(wait_list,id,value,charge_type)
+
+    return "Event request successful.", 200  # 返回登录成功消息和 200 状态码
 
 @app.route('/charging_request', methods=['POST'])
 def charging_request():
