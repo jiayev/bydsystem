@@ -17,6 +17,7 @@ slow_charging_queue = queue.Queue(maxsize=6)
 
 app = Flask(__name__)
 
+wait_list = None
 charging_requests = {}
 charging_cars = {}
 # 创建一个 Event 对象
@@ -44,7 +45,7 @@ def create_account_table():
     conn.close()
 @app.before_first_request
 def setup():
-    g.wait_list = WaitingList()
+    wait_list = WaitingList()
     print("Waiting list created.\n")
     op_sql.turn_on_all_charging_station()
     print("All charging stations are on.\n")
@@ -109,25 +110,38 @@ def login():
 
 
 @app.route('/event_request', methods=['POST'])
-def event_request():
-    event_type = request.form.get('event_type')
-    id = request.form.get('id')
-    value = request.form.get('value')
-    charge_type = request.form.get('charge_type')
-    wait_list = g.wait_list
+def event_request(event_type = None, id = None, value = None, charge_type = None):
+    # 如果参数为空，则从请求中获取参数
+    if event_type is None:
+        event_type = request.form.get('event_type')
+        id = request.form.get('id')
+        value = request.form.get('value')
+        charge_type = request.form.get('charge_type')
+    # 如果event_type不为ABC，charge_type不为F/T/O，则返回错误信息
+    elif event_type not in ['A', 'B', 'C'] or charge_type not in ['F', 'T', 'O']:
+        return "Invalid event type or charge type.", 400
     if event_type == 'A':
         if value != 0:
             WaitingList.add(wait_list,id,value,charge_type)
         else:
             WaitingList.remove(wait_list,id)
     elif event_type == 'B':
+            if op_sql.is_on_station(id) == value:
+                return "Charging station is already on/off.", 400
             op_sql.turn_on_off_charging_station(id,value)
+            if value == 1:
+                return "Charging station is on.", 200
+            else:
+                return "Charging station is off.", 200
     elif event_type == 'C':
             WaitingList.changeInfo(wait_list,id,value,charge_type)
 
     return "Event request successful.", 200  # 返回登录成功消息和 200 状态码
 
+
 @app.route('/charging_request', methods=['POST'])
+# 需要重写
+# 已经改为这个函数只负责接收请求，然后调用event_request函数
 def charging_request():
     request_data = request.get_json()
     vehicle_id = request_data['vehicle_id']
@@ -135,35 +149,9 @@ def charging_request():
     charging_volume = request_data['charging_volume']
 
     try:
-        conn = sqlite3.connect('charge.db')
-        conn2 = sqlite3.connect('charging_stations.db')
-        # 分配一个充电桩
-        assigned_station = assign_charging_station(conn2, vehicle_id, charging_mode)
+        response = event_request('A', vehicle_id, charging_volume, charging_mode)
 
-        # 如果没有可用的充电桩，返回错误信息
-        if assigned_station is None:
-            return {"status": "fail", "message": "All charging stations are currently full."}, 400
-
-        c = conn.cursor()
-        c2 = conn2.cursor()
-
-        c.execute(
-            f"INSERT INTO charging_cars(vehicle_id, charging_volume, charged_volume, charging_mode, charging_station) VALUES ('{vehicle_id}', {charging_volume}, 0, '{charging_mode}', '{assigned_station}')")
-
-
-        conn2.commit()
-        conn2.close()
-        conn.commit()
-        conn.close()
-
-        if is_charging_station_free(assigned_station):
-            charge_and_bill(vehicle_id, assigned_station, charging_volume)
-
-        # 返回成功信息和分配的电桩
-        response = {"status": "success",
-                    "message": f"Charging request received. Your vehicle has been assigned to charging station {assigned_station}."}
-
-        return response, 200
+        return response
 
 
     except Exception as e:
@@ -177,26 +165,10 @@ def charging_request():
         return {"status": "fail", "message": "An error occurred while processing your request."}, 500
 
 def is_charging_station_free(charging_station):
-    # 连接到你的数据库
-    conn = sqlite3.connect('charging_stations.db')
+    return op_sql.is_busy_station(charging_station)
 
-    # 创建一个Cursor对象
-    c = conn.cursor()
-
-    # 执行SQL查询来获取指定充电桩的状态
-    c.execute('SELECT status FROM charging_stations WHERE station_id = ?', (charging_station,))
-
-    # 获取查询结果
-    result = c.fetchone()
-
-    # 检查结果
-    if result is None:
-        # 如果没有找到指定的充电桩，那么抛出一个错误
-        raise ValueError("Invalid charging station ID")
-
-    # 如果充电桩的状态是"free"，那么返回True，否则返回False
-    return result[0] == 'free'
-
+def push_list_to_charging_station(wait_list):
+    return 200
 
 
 def charge_and_bill(conn, car_id, required_charge, charging_station_id):
@@ -240,7 +212,6 @@ def get_charging_cars():
     ]
 @app.route('/waiting_vehicles', methods=['GET'])
 def waiting_vehicals():
-    wait_list = g.wait_list
     request_data = ""
     # 对g.wait_list中的每个WaitingNode元素使用函数WaitingNode.getInfo，返回self.car_id, self.charge_value, self.charge_mode，整合为一个字符串
     for i in range(wait_list.getLength()):
@@ -250,7 +221,6 @@ def waiting_vehicals():
 
 def get_first_waiting_vehicle(charging_mode):
     # 返回等待队列中的第一个车辆
-    wait_list = g.wait_list
     if charging_mode == 'F':
         return wait_list.getFirstFast().car_id
     elif charging_mode == 'T':
@@ -263,26 +233,10 @@ def charging_detail():
     return {"message": "Charging detail returned successfully."}, 200
 
 @app.route('/charging_stations', methods=['GET'])
-def assign_charging_station(conn, car_id, charging_mode):
-    c = conn.cursor()
-
-    # 查询可用的充电桩
-    c.execute("SELECT station_id FROM charging_stations WHERE status='free' AND station_type=?", (charging_mode,))
-    free_stations = c.fetchall()
-
-    # 如果没有可用的充电桩，返回None
-    if not free_stations:
-        return None
-
-    # 选择一个可用的充电桩
-    chosen_station = free_stations[0][0]
-
-    # 更新数据库中的充电桩状态
-    c.execute("UPDATE charging_stations SET status='occupied', current_charging_car=? WHERE station_id=?",
-              (car_id, chosen_station))
-    conn.commit()
-
-    return chosen_station
+# 已经重写
+def assign_charging_station(car_id, charging_mode):
+    free_station = op_sql.get_first_free_station(charging_mode)
+    return free_station
 
 @app.route('/get_bill', methods=['GET'])
 def get_bill(car_id):

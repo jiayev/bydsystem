@@ -35,6 +35,24 @@ def update_charging_station(station_id, station_type, status, current_charging_c
     conn.commit()
     conn.close()
 
+def get_station_type(station_id):
+    conn = sqlite3.connect('charging_stations.db')
+    c = conn.cursor()
+    c.execute("SELECT station_type FROM charging_stations WHERE station_id = ?", (station_id,))
+    station_type = c.fetchone()[0]
+    conn.commit()
+    conn.close()
+    return station_type
+
+def get_first_free_station(station_type):
+    conn = sqlite3.connect('charging_stations.db')
+    c = conn.cursor()
+    c.execute("SELECT station_id FROM charging_stations WHERE station_type = ? AND status = 'free' AND on_service = '1'", (station_type,))
+    station_id = c.fetchone()[0]
+    conn.commit()
+    conn.close()
+    return station_id
+
 # 充电站切换busy或free
 def switch_charging_station(station_id, status):
     conn = sqlite3.connect('charging_stations.db')
@@ -43,6 +61,26 @@ def switch_charging_station(station_id, status):
               (status, station_id))
     conn.commit()
     conn.close()
+
+# 检测充电站是否在服务
+def is_on_station(station_id):
+    conn = sqlite3.connect('charging_stations.db')
+    c = conn.cursor()
+    c.execute("SELECT on_service FROM charging_stations WHERE station_id = ?", (station_id,))
+    on_service = c.fetchone()[0]
+    conn.commit()
+    conn.close()
+    return on_service
+
+# 检测充电桩是否繁忙
+def is_busy_station(station_id):
+    conn = sqlite3.connect('charging_stations.db')
+    c = conn.cursor()
+    c.execute("SELECT status FROM charging_stations WHERE station_id = ?", (station_id,))
+    status = c.fetchone()[0]
+    conn.commit()
+    conn.close()
+    return status
 
 # 开启或关闭充电站
 def turn_on_off_charging_station(station_id, on_service):
