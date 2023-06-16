@@ -19,9 +19,10 @@ slow_charging_queue = queue.Queue(maxsize=6)
 
 app = Flask(__name__)
 # 全局的充电车辆列表
-charging_cars = []
+charging_cars = {"A": [], "B": [], "C": [], "D": [], "E": []}
 
 wait_list = WaitingList()
+
 charging_requests = {}
 
 # 创建一个 Event 对象
@@ -169,15 +170,51 @@ def charging_request():
 
         return {"status": "fail", "message": "An error occurred while processing your request."}, 500
 
-def add_charging_car(car_id, charging_mode, charging_volume):
-    # 创建一个新的 ChargingCar 对象
-    new_car = ChargingCar(car_id, charging_mode, charging_volume)
+def add_charging_car(waiting_list):
+    conn = sqlite3.connect('charging_stations.db')
+    c = conn.cursor()
+    car_node = None
+    # 查询所有的充电站
+    c.execute("SELECT * FROM charging_stations")
 
-    # 将新的 ChargingCar 对象添加到 charging_cars 列表中
-    charging_cars.append(new_car)
+    stations = c.fetchall()
 
-    # 返回新的 ChargingCar 对象
-    return new_car
+    for station in stations:
+        station_id, station_type, status, _, _, on_service = station
+
+        # 如果充电站可用
+        if status == 'free' and on_service == 1:
+            # 根据充电站类型选择合适的车辆
+            if station_type == 'F':
+                car_node = waiting_list.getFirstFast()
+            elif station_type == 'T':
+                car_node = waiting_list.getFirstSlow()
+
+            if car_node is not None:
+                car_id, charge_value, charge_mode = car_node.getInfo()
+
+                # 创建新的充电车辆
+                new_car = ChargingCar(car_id, charge_value, charge_mode, is_charging=True)
+
+                # 将车辆添加到充电站
+                charging_cars[station_id].append(new_car)
+
+                # 更新数据库中的充电站状态
+                c.execute("UPDATE charging_stations SET status = 'busy', current_charging_car = ? WHERE station_id = ?", (car_id, station_id))
+
+                # 从等待列表中移除车辆
+                waiting_list.remove(car_id)
+
+                conn.commit()
+                conn.close()
+
+                return True
+
+    conn.close()
+
+    return False
+
+
 
 
 def is_charging_station_free(charging_station):

@@ -18,6 +18,7 @@ class ChargingStation:
         self.total_charging_time += charging_volume / self.power
 
 
+
 class ChargingCar:
     SERVICE_FEE = 0.8
     def __init__(self, car_id, charging_volume, charging_mode, is_charging=False):
@@ -75,7 +76,8 @@ class ChargingCar:
         total_fee = charging_fee + service_fee
 
         return total_fee
-
+    def is_charged(self):
+        return self.charging_volume == 0
 
     def add_to_bill(self):
         # 在这里添加将费用添加到详单的逻辑
