@@ -126,3 +126,70 @@ class WaitingList:
             else:
                 current_node = current_node.next
         return None
+    
+# 创建一个单向链表类，作为事件，包含参数：事件类型（A,B,C）,发生时间（格式00:00）,车辆ID（任意字符串）,充电量（浮点）,充电模式（T,F,O）
+class EventNode:
+    def __init__(self, event_type, event_time, car_id, charge_value, charge_mode):
+        self.event_type = event_type
+        self.event_time = event_time
+        self.car_id = car_id
+        self.charge_value = charge_value
+        self.charge_mode = charge_mode
+        self.next = None
+
+    def print(self):
+        print(self.event_type, self.event_time, self.car_id, self.charge_value, self.charge_mode)
+
+    def getInfo(self):
+        return self.event_type, self.event_time, self.car_id, self.charge_value, self.charge_mode
+    
+class EventList:
+    def __init__(self):
+        self.head = None
+        self.size = 0
+
+    def add(self, event_type, event_time, car_id, charge_value, charge_mode):
+        new_node = EventNode(event_type, event_time, car_id, charge_value, charge_mode)
+        if self.head is None:
+            self.head = new_node
+            self.size += 1
+        else:
+            current_node = self.head
+            while current_node.next is not None:
+                current_node = current_node.next
+            current_node.next = new_node
+            self.size += 1
+
+    def remove(self):
+        if self.head is None:
+            return
+        else:
+            self.head = self.head.next
+            self.size -= 1
+
+    def getFirst(self):
+        return self.head
+
+    def getLength(self):
+        return self.size
+
+    def print(self):
+        current_node = self.head
+        while current_node is not None:
+            current_node.print()
+            current_node = current_node.next
+
+    def sortByTime(self):
+        current_node = self.head
+        while current_node is not None:
+            next_node = current_node.next
+            while next_node is not None:
+                if current_node.event_time > next_node.event_time:
+                    current_node.event_type, next_node.event_type = next_node.event_type, current_node.event_type
+                    current_node.event_time, next_node.event_time = next_node.event_time, current_node.event_time
+                    current_node.car_id, next_node.car_id = next_node.car_id, current_node.car_id
+                    current_node.charge_value, next_node.charge_value = next_node.charge_value, current_node.charge_value
+                    current_node.charge_mode, next_node.charge_mode = next_node.charge_mode, current_node.charge_mode
+                next_node = next_node.next
+            current_node = current_node.next
+
