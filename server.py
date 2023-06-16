@@ -7,21 +7,27 @@ from waitinglist import WaitingNode
 from sqlite3 import Error
 from flask import Flask, request, g
 import threading
-from models import datetime
+from models import datetime, ChargingCar
 import queue
 import op_sql
+import Timesys
+
 
 # 创建两个队列，一个用于快充的请求，另一个用于慢充的请求
 fast_charging_queue = queue.Queue(maxsize=6)
 slow_charging_queue = queue.Queue(maxsize=6)
 
 app = Flask(__name__)
+# 全局的充电车辆列表
+charging_cars = []
 
-wait_list = None
+wait_list = WaitingList()
 charging_requests = {}
-charging_cars = {}
+
 # 创建一个 Event 对象
 stop_charging_cars = threading.Event()
+
+
 
 
 def display_charging_cars():
@@ -153,7 +159,6 @@ def charging_request():
 
         return response
 
-
     except Exception as e:
 
         print("Error occurred:", e)
@@ -164,6 +169,17 @@ def charging_request():
 
         return {"status": "fail", "message": "An error occurred while processing your request."}, 500
 
+def add_charging_car(car_id, charging_mode, charging_volume):
+    # 创建一个新的 ChargingCar 对象
+    new_car = ChargingCar(car_id, charging_mode, charging_volume)
+
+    # 将新的 ChargingCar 对象添加到 charging_cars 列表中
+    charging_cars.append(new_car)
+
+    # 返回新的 ChargingCar 对象
+    return new_car
+
+
 def is_charging_station_free(charging_station):
     return op_sql.is_busy_station(charging_station)
 
@@ -171,38 +187,7 @@ def push_list_to_charging_station(wait_list):
     return 200
 
 
-def charge_and_bill(conn, car_id, required_charge, charging_station_id):
-    # 根据电价时段确定单位电价
-    current_hour = datetime.now().hour
-    if 10 <= current_hour < 15 or 18 <= current_hour < 21:
-        unit_price = 1.0  # 峰时电价
-    elif 7 <= current_hour < 10 or 15 <= current_hour < 18 or 21 <= current_hour < 23:
-        unit_price = 0.7  # 平时电价
-    else:
-        unit_price = 0.4  # 谷时电价
 
-    # 计算充电费
-    charging_fee = unit_price * required_charge
-
-    # 计算服务费
-    service_fee_unit_price = 0.8  # 服务费单价
-    service_fee = service_fee_unit_price * required_charge
-
-    # 总费用 = 充电费 + 服务费
-    total_fee = charging_fee + service_fee
-
-    # 更新数据库中车辆的充电信息
-    c = conn.cursor()
-    c.execute("UPDATE cars SET charged=?, charging_fee=? WHERE id=?", (required_charge, total_fee, car_id))
-    conn.commit()
-
-    print(f"Car {car_id} has been charged at station {charging_station_id} for a total fee of {total_fee} yuan.")
-
-    # 更新充电桩状态
-    c.execute("UPDATE charging_stations SET status='free', current_charging_car='' WHERE station_id=?", (charging_station_id,))
-    conn.commit()
-
-    return total_fee
 
 def get_charging_cars():
     # 返回一个列表，每个元素都是一个字符串，描述了一个正在充电的汽车的信息
