@@ -141,7 +141,7 @@ def event_request(event_type = None, id = None, value = None, charge_type = None
                 WaitingList.remove(wait_list,id)
             #如果该车辆在充电队列中，则从充电队列中删除该车辆
             else:
-                charging_cars
+                charging_cars.updateValue(id,value)
 
     elif event_type == 'B':
             if op_sql.is_on_station(id) == value:
