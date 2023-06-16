@@ -59,6 +59,15 @@ class WaitingList:
     def getLength(self):
         return self.size
     
+    def isExist(self, car_id):
+        current_node = self.head
+        while current_node is not None:
+            if current_node.car_id == car_id:
+                return True
+            else:
+                current_node = current_node.next
+        return False
+
     def print(self):
         current_node = self.head
         while current_node is not None:

@@ -129,9 +129,20 @@ def event_request(event_type = None, id = None, value = None, charge_type = None
         return "Invalid event type or charge type.", 400
     if event_type == 'A':
         if value != 0:
-            WaitingList.add(wait_list,id,value,charge_type)
+            if (wait_list.isExist(id) == True):
+                wait_list.changeInfo(id,value,charge_type)
+            elif charging_cars.isExist(id) != True:
+                WaitingList.add(wait_list,id,value,charge_type)
+            else:
+                charging_cars.updateValue(id,value)
         else:
-            WaitingList.remove(wait_list,id)
+            #如果该车辆在等待队列中，则从等待队列中删除该车辆
+            if (wait_list.isExist(id)):
+                WaitingList.remove(wait_list,id)
+            #如果该车辆在充电队列中，则从充电队列中删除该车辆
+            else:
+                charging_cars
+
     elif event_type == 'B':
             if op_sql.is_on_station(id) == value:
                 return "Charging station is already on/off.", 400
