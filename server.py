@@ -24,7 +24,8 @@ charging_cars = {"A": [], "B": [], "C": [], "D": [], "E": []}
 wait_list = WaitingList()
 
 charging_requests = {}
-
+#创建一个存储current_car中的
+cars = {}
 # 创建一个 Event 对象
 stop_charging_cars = threading.Event()
 
@@ -169,6 +170,7 @@ def charging_request():
         traceback.print_exc()
 
         return {"status": "fail", "message": "An error occurred while processing your request."}, 500
+    
 def add_charging_car(waiting_list):
     conn = sqlite3.connect('charging_stations.db')
     c = conn.cursor()
@@ -188,8 +190,13 @@ def add_charging_car(waiting_list):
         if status == 'free' and on_service == 1:
             if current_charging_car is None and current_waiting_car is not None:
                 # 将等待的车辆移动到正在充电的车辆
-                current_charging_car = current_waiting_car
-                current_waiting_car = None
+                current_charging_car = cars[current_waiting_car]  # 从字典中获取车辆对象
+                del cars[current_waiting_car]  # 从字典中移除该车辆
+                car_id, charge_value, charge_mode = current_charging_car.getInfo()
+                new_car = ChargingCar(car_id, charge_value, charge_mode, is_charging=True)
+
+                # 将车辆添加到充电站
+                charging_cars[station_id].append(new_car)
 
                 c.execute(f"UPDATE charging_stations SET status = 'busy', current_charging_car = ? WHERE station_id = ?", (current_charging_car.car_id, station_id))
                 c.execute(f"UPDATE charging_stations SET current_waiting_car = ? WHERE station_id = ?", (None, station_id))
@@ -205,7 +212,11 @@ def add_charging_car(waiting_list):
                 if car_node is not None:
                     waiting_list.remove(car_node.car_id)
                     current_charging_car = car_node
+                    car_id, charge_value, charge_mode = current_charging_car.getInfo()
+                    new_car = ChargingCar(car_id, charge_value, charge_mode, is_charging=True)
 
+                    # 将车辆添加到充电站
+                    charging_cars[station_id].append(new_car)
                     c.execute(f"UPDATE charging_stations SET status = 'busy', current_charging_car = ? WHERE station_id = ?", (current_charging_car.car_id, station_id))
                     conn.commit()
 
@@ -220,11 +231,13 @@ def add_charging_car(waiting_list):
                     waiting_list.remove(car_node.car_id)
                     current_waiting_car = car_node
 
+                    # 添加车辆到字典
+                    cars[current_waiting_car.car_id] = current_waiting_car
+
                     c.execute(f"UPDATE charging_stations SET current_waiting_car = ? WHERE station_id = ?", (current_waiting_car.car_id, station_id))
                     conn.commit()
 
     conn.close()
-
 
 
 def is_charging_station_free(charging_station):
