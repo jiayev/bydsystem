@@ -11,21 +11,28 @@ from models import datetime, ChargingCar
 import queue
 import op_sql
 
+app = Flask(__name__)
+wait_list = WaitingList()
+#时间
+# 全局的充电车辆列表
+charging_cars = {"A": ChargingCar, "B": ChargingCar, "C": ChargingCar, "D": ChargingCar, "E": ChargingCar}
+# 设定开始时间，结束时间，时间单位，是否自动运行，和step
+start_time = 0
+end_time = 24
+# 时间系统从0小时开始，每个时间步为0.5小时，结束于24小时，自动运行
+time_unit = 0.5
+is_auto = False
+step = 1
+
+charging_requests = {}
+#创建一个存储current_car中的
+cars = {}
+
 
 
 # 创建两个队列，一个用于快充的请求，另一个用于慢充的请求
 # fast_charging_queue = queue.Queue(maxsize=6)
 # slow_charging_queue = queue.Queue(maxsize=6)
-
-app = Flask(__name__)
-# 全局的充电车辆列表
-charging_cars = {"A": [], "B": [], "C": [], "D": [], "E": []}
-
-wait_list = WaitingList()
-
-charging_requests = {}
-#创建一个存储current_car中的
-cars = {}
 
 def isWaitingCar(car_id):
     if cars[car_id] == None:
@@ -58,6 +65,12 @@ def create_account_table():
 
     conn.commit()
     conn.close()
+
+# 显示时间系统的当前时间
+@app.route('/time_system/current_time', methods=['GET'])
+def get_current_time():
+    return time_system.current_time, 200
+
 @app.before_first_request
 def setup():
     op_sql.turn_on_all_charging_station()
@@ -348,7 +361,116 @@ def print_all_accounts():
 def switch_station_status(station_id, status):
     op_sql.switch_charging_station(station_id, status)
 
+class TimeSystem:
+    def __init__(self, start_time, time_unit, end_time,is_auto, step,wait_list):
+        #time_unit表示时间系统的每个周期的长度如秒，分
+        self.end_time = end_time
+        self.current_time = start_time
+        self.start_time = start_time
+        self.time_unit = time_unit
+        self.is_auto = is_auto
+        self.step = step
 
+        self.wait_list = wait_list
+
+    def update_charging_station(self, station_id, status, current_charging_car):
+        # 连接到SQLite数据库
+        conn = sqlite3.connect('charging_stations.db')
+
+        # 创建一个Cursor对象
+        c = conn.cursor()
+
+        # 执行UPDATE语句
+        c.execute("""
+        UPDATE charging_stations
+        SET status = ?, current_charging_car = ?, 
+        WHERE station_id = ?
+        """, (status, current_charging_car, station_id))
+
+        # 提交事务
+        conn.commit()
+
+        # 关闭连接
+        conn.close()
+
+    def calculate_fee(self):
+        current_hour = time_system.current_time
+        # 判断当前时间属于哪个电价区间
+        if 10 <= current_hour < 15 or 18 <= current_hour < 21:
+            unit_price = 1.0  # 峰时电价
+        elif 7 <= current_hour < 10 or 15 <= current_hour < 18 or 21 <= current_hour < 23:
+            unit_price = 0.7  # 平时电价
+        else:
+            unit_price = 0.4  # 谷时电价
+
+        # 充电费=单位电价*充电度数
+        charging_fee = unit_price * self.charged_volume
+
+            # 服务费=服务费单价*充电度数
+        service_fee = self.SERVICE_FEE * self.charged_volume
+
+            # 总费用=充电费+服务费
+        total_fee = charging_fee + service_fee
+
+        return total_fee
+    
+    def step_forward(self):
+        while self.current_time <= self.end_time:
+            self.check_and_operate()
+            for station_id, car in list(charging_cars.items()):  # 遍历复制的字典，以防在迭代过程中改变字典
+                car.charge(time_unit)
+                self.calculate_fee()
+                car.add_to_bill()
+                if car.is_charged():  # 如果车辆已经充电完成
+                    del charging_cars[station_id]  # 从正在充电的车辆字典中移除
+                    self.update_charging_station(car.station_id, 'free', None)  # 将充电站状态更新为'free'
+                    # 这里可以添加更多的清理工作，如更新数据库等
+            self.current_time += self.step
+            if not self.is_auto:
+                break
+
+    def auto_run(self):
+        while self.current_time <= self.end_time:
+            for _ in range(int(1 / self.time_unit)):  # 这个循环会使得check_and_operate每秒运行一次
+                self.check_and_operate()
+                time.sleep(1)  # 暂停一秒
+            for station_id, car in list(charging_cars.items()):  # 遍历复制的字典，以防在迭代过程中改变字典
+                car.charge(time_unit)
+                self.calculate_fee()
+                car.add_to_bill()
+                if car.is_charged():  # 如果车辆已经充电完成
+                    del charging_cars[station_id]  # 从正在充电的车辆字典中移除
+                    self.update_charging_station(car.station_id, 'free', None)  # 将充电站状态更新为'free'
+                    # 这里可以添加更多的清理工作，如更新数据库等
+            self.current_time += self.step
+            time.sleep(self.time_unit)  # 假设time_unit以秒为单位
+
+    def check_and_operate(self):
+        # 在这里添加每个时间单位开始时进行的检查和操作
+
+        add_charging_car(self.wait_list)#把等待列表里的车添加到正在充电列表
+        pass
+
+
+
+# 初始化时间系统
+time_system = TimeSystem(start_time, time_unit, end_time, is_auto, step, wait_list)
+
+
+
+# 开始时间系统
+def start_time_system():
+    time_system.is_auto = True
+
+# 暂停时间系统
+def pause_time_system():
+    time_system.is_auto = False
+
+# 根据是否自动运行选择运行方式
+if time_system.is_auto:
+    time_system.auto_run()
+else:
+    time_system.step_forward()
 
 if __name__ == '__main__':
    
