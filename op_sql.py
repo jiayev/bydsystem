@@ -45,6 +45,14 @@ def query_station_by_car(car_id):
     conn.close()
     return station_id
 
+def remove_current_waiting_car(station_id):
+    # 将对应充电站的current_waiting_car置空
+    conn = sqlite3.connect('charging_stations.db')
+    c = conn.cursor()
+    c.execute("UPDATE charging_stations SET current_waiting_car = ? WHERE station_id = ?", ('', station_id))
+    conn.commit()
+    conn.close()
+
 def get_station_type(station_id):
     conn = sqlite3.connect('charging_stations.db')
     c = conn.cursor()

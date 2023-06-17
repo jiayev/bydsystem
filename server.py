@@ -14,8 +14,8 @@ import Timesys
 
 
 # 创建两个队列，一个用于快充的请求，另一个用于慢充的请求
-fast_charging_queue = queue.Queue(maxsize=6)
-slow_charging_queue = queue.Queue(maxsize=6)
+# fast_charging_queue = queue.Queue(maxsize=6)
+# slow_charging_queue = queue.Queue(maxsize=6)
 
 app = Flask(__name__)
 # 全局的充电车辆列表
@@ -26,6 +26,13 @@ wait_list = WaitingList()
 charging_requests = {}
 #创建一个存储current_car中的
 cars = {}
+
+def isWaitingCar(car_id):
+    if cars[car_id] == None:
+        return False
+    else:
+        return True
+
 # 创建一个 Event 对象
 stop_charging_cars = threading.Event()
 
@@ -53,8 +60,6 @@ def create_account_table():
     conn.close()
 @app.before_first_request
 def setup():
-    wait_list = WaitingList()
-    print("Waiting list created.\n")
     op_sql.turn_on_all_charging_station()
     print("All charging stations are on.\n")
 
@@ -131,8 +136,24 @@ def event_request(event_type = None, id = None, value = None, charge_type = None
     if event_type == 'A':
         if value != 0:
             WaitingList.add(wait_list,id,value,charge_type)
+        if wait_list.isExist(id):
+            if value!= 0:
+                wait_list.changeInfo(id,value,charge_type)
+            else:
+                wait_list.remove(id)
         else:
             WaitingList.remove(wait_list,id)
+            carstation = op_sql.query_station_by_car(id)
+            if carstation != None:
+                if isWaitingCar(id):
+                    if value == 0:
+                        del cars[id]
+                        op_sql.remove_current_waiting_car(carstation)
+                    else: cars[id].chargevalue = value
+                else:
+                    charging_cars[carstation].modify_remaining_volume(value)
+            else:
+                wait_list.add(id,value,charge_type)
     elif event_type == 'B':
             if op_sql.is_on_station(id) == value:
                 return "Charging station is already on/off.", 400
@@ -243,8 +264,8 @@ def add_charging_car(waiting_list):
 def is_charging_station_free(charging_station):
     return op_sql.is_busy_station(charging_station)
 
-def push_list_to_charging_station(wait_list):
-    return 200
+# def push_list_to_charging_station(wait_list):
+#     return 200
 
 
 
