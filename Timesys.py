@@ -16,7 +16,7 @@ class TimeSystem:
 
         self.wait_list = wait_list
 
-    def update_charging_station(self, station_id, status, current_charging_car, current_waiting_car, on_service):
+    def update_charging_station(self, station_id, status, current_charging_car):
         # 连接到SQLite数据库
         conn = sqlite3.connect('charging_stations.db')
 
@@ -26,9 +26,9 @@ class TimeSystem:
         # 执行UPDATE语句
         c.execute("""
         UPDATE charging_stations
-        SET status = ?, current_charging_car = ?, current_waiting_car = ?, on_service = ?
+        SET status = ?, current_charging_car = ?, 
         WHERE station_id = ?
-        """, (status, current_charging_car, current_waiting_car, on_service, station_id))
+        """, (status, current_charging_car, station_id))
 
         # 提交事务
         conn.commit()
@@ -57,7 +57,7 @@ class TimeSystem:
                 car.add_to_bill()
                 if car.is_charged():  # 如果车辆已经充电完成
                     del charging_cars[station_id]  # 从正在充电的车辆字典中移除
-                    self.update_charging_station(car.station_id, 'free', None, None, 1)  # 将充电站状态更新为'free'
+                    self.update_charging_station(car.station_id, 'free', None)  # 将充电站状态更新为'free'
                     # 这里可以添加更多的清理工作，如更新数据库等
             self.current_time += self.step
             time.sleep(self.time_unit)  # 假设time_unit以秒为单位

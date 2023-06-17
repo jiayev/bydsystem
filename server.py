@@ -129,20 +129,9 @@ def event_request(event_type = None, id = None, value = None, charge_type = None
         return "Invalid event type or charge type.", 400
     if event_type == 'A':
         if value != 0:
-            if (wait_list.isExist(id) == True):
-                wait_list.changeInfo(id,value,charge_type)
-            elif charging_cars.isExist(id) != True:
-                WaitingList.add(wait_list,id,value,charge_type)
-            else:
-                charging_cars.updateValue(id,value)
+            WaitingList.add(wait_list,id,value,charge_type)
         else:
-            #如果该车辆在等待队列中，则从等待队列中删除该车辆
-            if (wait_list.isExist(id)):
-                WaitingList.remove(wait_list,id)
-            #如果该车辆在充电队列中，则从充电队列中删除该车辆
-            else:
-                charging_cars.updateValue(id,value)
-
+            WaitingList.remove(wait_list,id)
     elif event_type == 'B':
             if op_sql.is_on_station(id) == value:
                 return "Charging station is already on/off.", 400
@@ -180,50 +169,76 @@ def charging_request():
         traceback.print_exc()
 
         return {"status": "fail", "message": "An error occurred while processing your request."}, 500
-
 def add_charging_car(waiting_list):
+    # 连接到数据库
     conn = sqlite3.connect('charging_stations.db')
     c = conn.cursor()
-    car_node = None
-    # 查询所有的充电站
-    c.execute("SELECT * FROM charging_stations")
 
-    stations = c.fetchall()
+    # 查询charging_stations数据
+    c.execute('SELECT * FROM charging_stations')
+    charging_stations = c.fetchall()
 
-    for station in stations:
-        station_id, station_type, status, _, _, on_service = station
+    for row in charging_stations:
+        station_id = row[0]
+        station_type = row[1]
+        status = row[2]
+        current_charging_car = row[3]
+        charging_queue = row[4]
+        current_waiting_car = row[5]
+        on_service = row[6]
 
-        # 如果充电站可用
         if status == 'free' and on_service == 1:
-            # 根据充电站类型选择合适的车辆
-            if station_type == 'F':
-                car_node = waiting_list.getFirstFast()
-            elif station_type == 'T':
-                car_node = waiting_list.getFirstSlow()
+            if current_charging_car is None:  # 如果当前充电车辆为空
+                if current_waiting_car is not None:  # 从等待队列中获取车辆
+                    # 将该车辆加到当前充电车辆
+                    current_charging_car = current_waiting_car
+                    current_waiting_car = None  # 将等待队列清空
+                else:  # 如果等待队列也为空，那么从全局等待列表获取车辆
+                    if station_type == 'F':
+                        car_node = waiting_list.getFirstFast()  # 获取第一辆模式为F的等待车辆
+                    else:
+                        car_node = waiting_list.getFirstSlow()  # 获取第一辆模式为T的等待车辆
 
-            if car_node is not None:
-                car_id, charge_value, charge_mode = car_node.getInfo()
+                    if car_node is not None:  # 如果找到了等待车辆
+                        # 创建charging_car实例
+                        car_id, charge_value, charge_mode = car_node.getInfo()
+                        new_car = ChargingCar(car_id, charge_value, charge_mode, is_charging=True)
 
-                # 创建新的充电车辆
-                new_car = ChargingCar(car_id, charge_value, charge_mode, is_charging=True)
+                        # 将车辆添加到充电站
+                        charging_cars[station_id].append(new_car)
+                        # 从等待队列中移除该车辆
+                        waiting_list.remove(car_node.car_id)
+                        # 将该车辆加到当前充电车辆
+                        current_charging_car = car_node.car_id
 
-                # 将车辆添加到充电站
-                charging_cars[station_id].append(new_car)
-
-                # 更新数据库中的充电站状态
-                c.execute("UPDATE charging_stations SET status = 'busy', current_charging_car = ? WHERE station_id = ?", (car_id, station_id))
-
-                # 从等待列表中移除车辆
-                waiting_list.remove(car_id)
-
+                # 更新charging_stations数据库
+                c.execute(f'''UPDATE charging_stations SET status = 'busy', 
+                            current_charging_car = '{current_charging_car}', 
+                            current_waiting_car = {current_waiting_car if current_waiting_car else 'NULL'} 
+                            WHERE station_id = '{station_id}' ''')
                 conn.commit()
-                conn.close()
+                break  # 已经找到空闲的充电站，不需要再遍历其他充电站
 
-                return True
+            elif current_waiting_car is None:  # 如果当前等待车辆为空
+                if station_type == 'F':
+                    car_node = waiting_list.getFirstFast()  # 获取第一辆模式为F的等待车辆
+                else:
+                    car_node = waiting_list.getFirstSlow()  # 获取第一辆模式为T的等待车辆
 
+                if car_node is not None:  # 如果找到了等待车辆
+                    # 从等待队列中移除该车辆
+                    waiting_list.remove(car_node.car_id)
+                    # 将该车辆加到当前等待车辆
+                    current_waiting_car = car_node.car_id
+                    # 更新charging_stations数据库
+                    c.execute(f'''UPDATE charging_stations SET 
+                            current_waiting_car = '{current_waiting_car}' 
+                            WHERE station_id = '{station_id}' ''')
+                    conn.commit()
+                    break  # 已经找到空闲的充电站，不需要再遍历其他充电站
+
+    # 关闭数据库连接
     conn.close()
-
-    return False
 
 
 
