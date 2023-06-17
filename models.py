@@ -42,6 +42,9 @@ class ChargingCar:
     def stop_charging(self):
         self.is_charging = False
 
+    def modify_remaining_volume(self, volume):
+        self.charging_volume = volume
+
     def charge(self, time_unit):
         # 计算这个时间单位的充电量
         charge_this_unit = self.charge_rate * time_unit

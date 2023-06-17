@@ -9,7 +9,7 @@ def query_station_all():
         print(row)
     conn.close() 
 
-def nsert_charging_station(station_id, station_type, status, current_charging_car, charging_queue, current_waiting_car):
+def insert_charging_station(station_id, station_type, status, current_charging_car, charging_queue, current_waiting_car):
     #这个要传入所有参数，壕沟巴烦
     conn = sqlite3.connect('charging_stations.db')
     c = conn.cursor()
@@ -34,6 +34,16 @@ def update_charging_station(station_id, station_type, status, current_charging_c
               (station_type, status, current_charging_car, charging_queue, current_waiting_car, station_id, on_service))
     conn.commit()
     conn.close()
+
+def query_station_by_car(car_id):
+    # 根据car_id查询充电站，car可能在充电，也可能在等待
+    conn = sqlite3.connect('charging_stations.db')
+    c = conn.cursor()
+    c.execute("SELECT station_id FROM charging_stations WHERE current_charging_car = ? OR current_waiting_car = ?", (car_id, car_id))
+    station_id = c.fetchone()[0]
+    conn.commit()
+    conn.close()
+    return station_id
 
 def get_station_type(station_id):
     conn = sqlite3.connect('charging_stations.db')

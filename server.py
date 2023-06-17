@@ -128,10 +128,18 @@ def event_request(event_type = None, id = None, value = None, charge_type = None
     elif event_type not in ['A', 'B', 'C'] or charge_type not in ['F', 'T', 'O']:
         return "Invalid event type or charge type.", 400
     if event_type == 'A':
-        if value != 0:
-            WaitingList.add(wait_list,id,value,charge_type)
+        if wait_list.isExist(id):
+            if value!= 0:
+                wait_list.changeInfo(id,value,charge_type)
+            else:
+                wait_list.remove(id)
         else:
-            WaitingList.remove(wait_list,id)
+            carstation = op_sql.query_station_by_car(id)
+            if carstation != None:
+                charging_cars[carstation].modify_remaining_volume(value)
+            else:
+                wait_list.add(id,value,charge_type)
+
     elif event_type == 'B':
             if op_sql.is_on_station(id) == value:
                 return "Charging station is already on/off.", 400
