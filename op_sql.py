@@ -153,6 +153,7 @@ def query_queue_all():
         print(row)
     conn.close() 
 
+
 def insert_wait_queue(queue_id, queue_value, queue_type, queue_order):
     conn = sqlite3.connect('charging_stations.db')
     c = conn.cursor()
@@ -193,6 +194,24 @@ def insert_detail_bill(detail_id, car_id, detail_time, charge_id, charge_sum, ch
               (detail_id, car_id, detail_time, charge_id, charge_sum, chatge_time, start_time, end_time, charge_fee, server_fee, total_fee)) 
     conn.commit()
     conn.close()
+
+def count_detail_rows():
+    #统计当前数据行数，用于生成详单编号
+    conn = sqlite3.connect('charging_stations.db')
+    c = conn.cursor()
+    c.execute('SELECT COUNT(*) FROM detail_bill')
+    row_count = c.fetchone()[0]
+    conn.close()
+    return row_count
+
+def find_by_car_id(car_id):
+    #通过car_id查找
+    conn = sqlite3.connect('charging_stations.db')
+    c = conn.cursor()
+    c.execute('SELECT * FROM detail_bill WHERE car_id=?', (car_id,))
+    result = c.fetchone()
+    conn.close()
+    return result
 
 def delete_detail_bill(detail_id):
     conn = sqlite3.connect('charging_stations.db')
