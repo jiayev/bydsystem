@@ -10,7 +10,7 @@ import threading
 from models import datetime, ChargingCar
 import queue
 import op_sql
-import Timesys
+
 
 
 # 创建两个队列，一个用于快充的请求，另一个用于慢充的请求

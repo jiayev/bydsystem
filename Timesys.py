@@ -35,6 +35,27 @@ class TimeSystem:
 
         # 关闭连接
         conn.close()
+
+        def calculate_fee(self):
+            current_hour = time_system.current_time
+            # 判断当前时间属于哪个电价区间
+            if 10 <= current_hour < 15 or 18 <= current_hour < 21:
+                unit_price = 1.0  # 峰时电价
+            elif 7 <= current_hour < 10 or 15 <= current_hour < 18 or 21 <= current_hour < 23:
+                unit_price = 0.7  # 平时电价
+            else:
+                unit_price = 0.4  # 谷时电价
+
+            # 充电费=单位电价*充电度数
+            charging_fee = unit_price * self.charged_volume
+
+            # 服务费=服务费单价*充电度数
+            service_fee = self.SERVICE_FEE * self.charged_volume
+
+            # 总费用=充电费+服务费
+            total_fee = charging_fee + service_fee
+
+            return total_fee
     def step_forward(self):
         while self.current_time <= self.end_time:
             self.check_and_operate()
