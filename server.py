@@ -21,7 +21,7 @@ start_time = 0
 end_time = 24
 # 时间系统从0小时开始，每个时间步为0.5小时，结束于24小时，自动运行
 time_unit = 0.5
-is_auto = True
+is_auto = False
 step = 1
 
 charging_requests = {}
@@ -363,15 +363,27 @@ def switch_station_status(station_id, status):
 
 class TimeSystem:
     def __init__(self, start_time, time_unit, end_time,is_auto, step,wait_list):
+        self.pause_time = None
+        self.resume_time = None
+
         #time_unit表示时间系统的每个周期的长度如秒，分
+        self.paused = True
+        self.mode = "auto" #初始化时间模式
         self.end_time = end_time
         self.current_time = start_time
         self.start_time = start_time
         self.time_unit = time_unit
         self.is_auto = is_auto
         self.step = step
-
+        self.running = False  # 初始化 running 为 False
         self.wait_list = wait_list
+
+    def set_pause_and_resume_time(self, pause_time, resume_time):
+        self.pause_time = pause_time
+        self.resume_time = resume_time
+
+    def run_until(self, until_time):
+        self.pause_time = until_time
 
     def update_charging_station(self, station_id, status, current_charging_car):
         # 连接到SQLite数据库
@@ -415,7 +427,19 @@ class TimeSystem:
         return total_fee
 
     def step_forward(self):
+        print(f"Step forward running in thread {threading.current_thread().name}")
+        self.running = True  # 开始运行
         while self.current_time <= self.end_time:
+            print(f"Current time: {self.current_time}, Pause time: {self.pause_time}, Resume time: {self.resume_time}")
+            # 如果当前时间在暂停和恢复时间之间，就暂停执行
+            if self.pause_time is not None and self.resume_time is not None and self.pause_time <= self.current_time < self.resume_time:
+                self.paused = True
+                print("Pausing...")
+                while self.paused and self.current_time < self.resume_time:
+                    time.sleep(self.time_unit)
+                self.paused = False
+                print("Resuming...")
+            # 正常运行的代码...
             self.check_and_operate()
             for station, cars in charging_cars.items():
                 for car in cars:
@@ -426,29 +450,41 @@ class TimeSystem:
                         cars.remove(car)  # 从正在充电的车辆列表中移除
                         self.update_charging_station(station, 'free', None)  # 将充电站状态更新为'free'
             self.current_time += self.step
-            if not self.is_auto:
-                break
+            print(f"Current time in step forward: {self.current_time}")
+
+        self.running = False  # 停止运行
+
+        print('Finished step_forward method.')
 
     def auto_run(self):
-        def run_loop():
-            while self.current_time <= self.end_time:
-                for _ in range(int(1 / self.time_unit)):
-                    self.check_and_operate()
-                    time.sleep(1)
-                for station, cars in charging_cars.items():
-                    for car in cars:
-                        car.charge(self.time_unit)
-                        self.calculate_fee()
-                        car.add_to_bill()
-                        if car.is_charged():  # 如果车辆已经充电完成
-                            cars.remove(car)  # 从正在充电的车辆列表中移除
-                            self.update_charging_station(station, 'free', None)  # 将充电站状态更新为'free'
-                self.current_time += self.step
-                time.sleep(self.time_unit)
+        print(f"Auto run running in thread {threading.current_thread().name}")
+        self.running = True  # 开始运行
+        while self.current_time <= self.end_time:
+            print(f"Current time: {self.current_time}")
+            for _ in range(int(1 / self.time_unit)):
+                self.check_and_operate()
+                time.sleep(1)
+            for station, cars in charging_cars.items():
+                for car in cars:
+                    car.charge(self.time_unit)
+                    self.calculate_fee()
+                    car.add_to_bill()
+                    if car.is_charged():  # 如果车辆已经充电完成
+                        cars.remove(car)  # 从正在充电的车辆列表中移除
+                        self.update_charging_station(station, 'free', None)  # 将充电站状态更新为'free'
+            self.current_time += self.step
 
-        thread = threading.Thread(target=run_loop)
-        thread.start()
+            time.sleep(self.time_unit)
+        self.running = False  # 停止运行
 
+    def run(self):
+            if self.running:  # 如果已经在运行，就直接返回
+                return
+            if self.mode == "step":
+                thread = threading.Thread(target=self.step_forward)
+            else:
+                thread = threading.Thread(target=self.auto_run)
+            thread.start()  # 在新的线程中运行 step_forward 或 auto_run 方法
     def check_and_operate(self):
         # 在这里添加每个时间单位开始时进行的检查和操作
 
@@ -458,26 +494,30 @@ class TimeSystem:
 
 
 # 初始化时间系统
-time_system = TimeSystem(start_time, time_unit, end_time, is_auto, step, wait_list)
-time_system.auto_run()
 
+@app.route('/set_pause_and_resume_time', methods=['POST'])
+def set_pause_and_resume_time():
+    new_pause_time = request.json['pause_time']
+    new_resume_time = request.json['resume_time']
+    time_system.pause_time = new_pause_time
+    time_system.resume_time = new_resume_time
+    return jsonify({'status': 'success'})
 
-# 开始时间系统
-def start_time_system():
-    time_system.is_auto = True
+@app.route('/set_mode', methods=['POST'])
+def set_mode():
 
-# 暂停时间系统
-def pause_time_system():
-    time_system.is_auto = False
+    new_mode = request.json['mode']
+    if new_mode in ["step", "auto"]:
+        print(f'Before: mode = {time_system.mode}, running = {time_system.running}')
+        time_system.running = False  # 停止当前的模式
+        time.sleep(1)  # 等待一段时间让当前的模式完全停止
+        time_system.mode = new_mode  # 切换到新的模式
+        time_system.run()  # 开始运行新的模式
+        print(f'After: mode = {time_system.mode}, running = {time_system.running}')
+        return jsonify({'status': 'success'})
 
-# 根据是否自动运行选择运行方式
-if time_system.is_auto:
-    time_system.auto_run()
-else:
-    time_system.step_forward()
-
-
-
+    else:
+        return jsonify({'status': 'error', 'message': 'Invalid mode'}), 400
 
 
 @app.route('/current_time')
@@ -485,9 +525,18 @@ def current_time():
     hours, remainder = divmod(time_system.current_time, 1)
     minutes = int(remainder * 60)
     return jsonify({'current_time': f'{int(hours):02d}:{minutes:02d}'})
+def run_app():
+    app.run(port=5000, debug=True)
+
+time_system = TimeSystem(start_time, time_unit, end_time, is_auto, step, wait_list)
+time_thread = threading.Thread(target=time_system.run)
+
+time_thread.start()
+run_app()
+
 
 if __name__ == '__main__':
-    app.run(port=5000, debug=True)
+
     # WaitingList.add(wait_list, 'lv1', 12, 'F')
     # WaitingList.add(wait_list, 'lv2', 13, 'T')
     # wait_list.print()

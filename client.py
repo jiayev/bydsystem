@@ -1,10 +1,53 @@
 import requests
-
+import json
 # 设置服务器的基础URL
 BASE_URL = 'http://localhost:5000'
 
 # 程序启动时请求一次服务器
 response = requests.get(f'{BASE_URL}/')
+
+import requests
+import json
+
+def set_pause_and_resume_time(pause_time, resume_time):
+    # 设置请求的URL
+    url = 'http://localhost:5000/set_pause_and_resume_time'
+
+    # 设置请求的数据
+    data = {'pause_time': pause_time, 'resume_time': resume_time}
+
+    # 发送POST请求
+    response = requests.post(url, data=json.dumps(data), headers={'Content-Type': 'application/json'})
+
+    # 获取服务器的响应
+    response_data = response.json()
+
+    if response_data['status'] == 'success':
+        print(f'Successfully set pause time to {pause_time} and resume time to {resume_time}')
+    else:
+        print(f'Error setting pause and resume time')
+
+def change_mode(new_mode):
+    # 设置请求的URL
+    url = 'http://localhost:5000/set_mode'
+
+    # 设置请求的数据
+    data = {'mode': new_mode}
+
+    # 发送POST请求
+    response = requests.post(url, data=json.dumps(data), headers={'Content-Type': 'application/json'})
+
+    # 获取服务器的响应
+    response_data = response.json()
+
+    if response_data['status'] == 'success':
+        print(f'Successfully changed mode to {new_mode}')
+    else:
+        print(f'Error changing mode: {response_data["message"]}')
+
+
+
+
 
 # 主文件中函数event_request(event_type,id,charge_type,value)
 
@@ -138,11 +181,13 @@ def main():
             print("2. Logout")
         print("3. Submit a charging request")
         print("4. View Charging Stations Usage")
-        print("5. Exit")
+        print('5. Set pause and resume time')
+        print("6. Exit")
         if admin:
             print("6. Start/Stop Charging Station")
             print("7. Get Waiting Cars List")
             print("8. Get Report [WIP]")
+            print("9. Set Mode")  # 添加新的菜单选项
         if username is not None:
             print("b. Check Bill")
 
@@ -184,8 +229,11 @@ def main():
             #     print("Please login first.")
             #else:
             charging_stations_inf()
-                
-        elif option == "5":
+        elif option == '5':
+            pause_time = input('Enter pause time (as minutes from midnight, e.g. 360 for 06:00): ')
+            resume_time = input('Enter resume time (as minutes from midnight, e.g. 480 for 08:00): ')
+            set_pause_and_resume_time(int(pause_time), int(resume_time))
+        elif option == "6":
             print("Exiting... Thank you!")
             break
 
@@ -217,7 +265,14 @@ def main():
                 print("You are not an admin.")
             else:
                 get_reports()
-
+        elif option == "9":
+            if username is None:
+                print("Please login first.")
+            elif not admin:
+                print("You are not an admin.")
+            else:
+                new_mode = input('Enter new mode (step or auto): ')
+                change_mode(new_mode)  # 调用change_mode函数来切换模式
         elif option == "b":
             if username is None:
                 print("Please login first.")
