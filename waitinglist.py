@@ -1,4 +1,7 @@
 # 创建一个双向链表类，包含参数：car_id, charge_value, charge_mode
+import json
+
+
 class WaitingNode:
     def __init__(self, car_id, charge_value, charge_mode):
         self.car_id = car_id
@@ -47,6 +50,7 @@ class WaitingList:
                 else:
                     current_node = current_node.next
 
+
     def get(self, car_id):
         current_node = self.head
         while current_node is not None:
@@ -73,6 +77,20 @@ class WaitingList:
         while current_node is not None:
             current_node.print()
             current_node = current_node.next
+
+    # 根据参数获取车辆信息
+    def getInfo(self, car_id, attr):
+        current_node = self.head
+        while current_node is not None:
+            if current_node.car_id == car_id:
+                if attr == 'charge_value':
+                    return current_node.charge_value
+                elif attr == 'charge_mode':
+                    return current_node.charge_mode
+                else:
+                    return None
+            else:
+                current_node = current_node.next
 
     def changeInfo(self, car_id, charge_value, charge_mode):
         current_node = self.head
@@ -141,7 +159,7 @@ class EventNode:
         print(self.event_type, self.event_time, self.car_id, self.charge_value, self.charge_mode)
 
     def getInfo(self):
-        return self.event_type, self.event_time, self.car_id, self.charge_value, self.charge_mode
+        return json.dumps({'event_type': self.event_type, 'event_time': self.event_time, 'car_id': self.car_id, 'charge_value': self.charge_value, 'charge_mode': self.charge_mode})
     
 class EventList:
     def __init__(self):
@@ -178,6 +196,28 @@ class EventList:
         while current_node is not None:
             current_node.print()
             current_node = current_node.next
+
+    def getInfoByEach(self):
+        current_node = self.head
+        info = []
+        while current_node is not None:
+            info.append(current_node.getInfo())
+            current_node = current_node.next
+        return info
+    
+    def removeByTime(self, time):
+        current_node = self.head
+        while current_node is not None:
+            if current_node.event_time <= time:
+                if current_node == self.head:
+                    self.head = self.head.next
+                    self.size -= 1
+                else:
+                    current_node.prev.next = current_node.next
+                    self.size -= 1
+                break
+            else:
+                current_node = current_node.next
 
     def sortByTime(self):
         current_node = self.head

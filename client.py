@@ -1,3 +1,4 @@
+import re
 import requests
 import json
 # 设置服务器的基础URL
@@ -105,6 +106,10 @@ def get_bill(username):
     response = requests.get(f'{BASE_URL}/get_bill', data={'username': username})
     print(response.json()['message'])
 
+def apply_event(event_type, event_time, car_id, charge_value, charge_mode):
+    response = requests.post(f'{BASE_URL}/apply_event', data={'event_type': event_type, 'event_time': event_time, 'car_id': car_id, 'charge_value': charge_value, 'charge_mode': charge_mode})
+    print(response.json()['message'])
+
 # 启动充电桩
 def start_charger(charger_id):
     response = requests.post(f'{BASE_URL}/event_request', data={'event_type': 'B', 'id': charger_id, 'charge_type': 'O', 'value': 1})
@@ -155,6 +160,9 @@ def main():
         if response.status_code != 200:
             print('Failed to connect to server.')
             return
+        # return jsonify({'current_time': f'{int(hours):02d}:{minutes:02d}'})
+        current_time = requests.get(f'{BASE_URL}/current_time')
+        print(f'\nCurrent time: {current_time.json()["current_time"]}')
         print("\nCurrent Status:")
         if username is None: print("Not logged in.")
         else: 
@@ -166,11 +174,11 @@ def main():
             print("2. Login")
         else:
             print("2. Logout")
-        print("3. Submit a charging request")
+        print("3. Submit or change a charging request")
         print("4. View Charging Stations Usage")
         print('5. Set pause and resume5'
               ' time')
-        print("6. Exit")
+        print("e. Exit")
         if admin:
             print("6. Start/Stop Charging Station")
             print("7. Get Waiting Cars List")
@@ -208,19 +216,40 @@ def main():
             if username is None:
                 print("Please login first.")
             else:
-                vehicle_id = input('Enter your vehicle ID: ')
-                charging_mode = input('Enter charging mode (fast or slow): ')
-                charging_volume = float(input('Enter charging volume: '))
-                event_request('A',vehicle_id, charging_mode, charging_volume)
+                # vehicle_id = input('Enter your vehicle ID: ')
+                # charging_mode = input('Enter charging mode (fast or slow): ')
+                # charging_volume = float(input('Enter charging volume: '))
+                # event_request('A',vehicle_id, charging_mode, charging_volume)
+                # 改用apply_event
+                event_type = input('Enter event type (A or C): ')
+                if event_type != 'A' and event_type != 'C':
+                    print('Invalid event type.')
+                    continue
+                # event_time = input('Enter event time: ')
+                # 时间为输入一个符合时间格式的值(00:00)，然后转换为浮点
+                event_time = input('Enter event time (hh:mm): ')
+                # 如果输入的时间格式不正确，就重新输入
+                while not re.match(r'^[0-2][0-9]:[0-5][0-9]$', event_time):
+                    print('Invalid time format.')
+                    event_time = input('Enter event time (hh:mm): ')
+                hours, minutes = event_time.split(':')
+                event_time = float(hours) + float(minutes) / 60
+                car_id = input('Enter car ID: ')
+                charge_value = float(input('Enter charge value: '))
+                charge_mode = input('Enter charge mode (F or T): ')
+                if charge_mode != 'F' and charge_mode != 'T':
+                    print('Invalid charge mode.')
+                    continue
+                apply_event(event_type, event_time, car_id, charge_value, charge_mode)
         elif option == "4":
             # if username is None:
             #     print("Please login first.")
             #else:
             charging_stations_inf()
         elif option == '5':
-            hour = int(input("Please input the hour to run until (0-24): "))
+            hour = float(input("Please input the hour to run until (0-24): "))
             run_until_client(hour)
-        elif option == "6":
+        elif option == "e":
             print("Exiting... Thank you!")
             break
 
@@ -230,12 +259,26 @@ def main():
             elif not admin:
                 print("You are not an admin.")
             else:
+                # station_id = input('Enter station ID: ')
+                # action = input('Enter action (start or stop): ')
+                # if action == 'start':
+                #     event_request('B', station_id, 'O', 1)
+                # elif action == 'stop':
+                #     event_request('B', station_id, 'O', 0)
+                # 改用apply_event
+                event_type = 'B'
+                event_time = input('Enter event time (hh:mm): ')
+                hours, minutes = event_time.split(':')
+                event_time = float(hours) + float(minutes) / 60
+                while not re.match(r'^[0-2][0-9]:[0-5][0-9]$', event_time):
+                    print('Invalid time format.')
+                    event_time = input('Enter event time (hh:mm): ')
                 station_id = input('Enter station ID: ')
                 action = input('Enter action (start or stop): ')
                 if action == 'start':
-                    event_request('B', station_id, 'O', 1)
+                    apply_event(event_type, event_time, station_id, 1, 'O')
                 elif action == 'stop':
-                    event_request('B', station_id, 'O', 0)
+                    apply_event(event_type, event_time, station_id, 0, 'O')
 
         elif option == "7":
             if username is None:

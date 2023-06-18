@@ -4,6 +4,8 @@ import sqlite3
 import waitinglist
 from waitinglist import WaitingList
 from waitinglist import WaitingNode
+from waitinglist import EventList
+from waitinglist import EventNode
 from sqlite3 import Error
 from flask import Flask, request, jsonify
 import threading
@@ -28,6 +30,7 @@ charging_requests = {}
 #创建一个存储current_car中的
 cars = {}
 
+event_list = EventList()
 
 
 # 创建两个队列，一个用于快充的请求，另一个用于慢充的请求
@@ -116,6 +119,24 @@ def check_account(username, password):
             return 2
         return 1
 
+@app.route('/apply_event', methods=['POST'])
+# class EventNode:
+#     def __init__(self, event_type, event_time, car_id, charge_value, charge_mode):
+#         self.event_type = event_type
+#         self.event_time = event_time
+#         self.car_id = car_id
+#         self.charge_value = charge_value
+#         self.charge_mode = charge_mode
+#         self.next = None
+def apply_event():
+    event_type = request.form.get('event_type')
+    event_time = request.form.get('event_time')
+    car_id = request.form.get('car_id')
+    charge_value = request.form.get('charge_value')
+    charge_mode = request.form.get('charge_mode')
+    event_list.add(event_type, event_time, car_id, charge_value, charge_mode)
+    return "Event applied.", 200
+
 
 @app.route('/login', methods=['POST'])
 
@@ -147,26 +168,7 @@ def event_request(event_type = None, id = None, value = None, charge_type = None
     elif event_type not in ['A', 'B', 'C'] or charge_type not in ['F', 'T', 'O']:
         return "Invalid event type or charge type.", 400
     if event_type == 'A':
-        if value != 0:
-            WaitingList.add(wait_list,id,value,charge_type)
-        if wait_list.isExist(id):
-            if value!= 0:
-                wait_list.changeInfo(id,value,charge_type)
-            else:
-                wait_list.remove(id)
-        else:
-            WaitingList.remove(wait_list,id)
-            carstation = op_sql.query_station_by_car(id)
-            if carstation != None:
-                if isWaitingCar(id):
-                    if value == 0:
-                        del cars[id]
-                        op_sql.remove_current_waiting_car(carstation)
-                    else: cars[id].chargevalue = value
-                else:
-                    charging_cars[carstation].modify_remaining_volume(value)
-            else:
-                wait_list.add(id,value,charge_type)
+        WaitingList.add(wait_list,id,value,charge_type)
     elif event_type == 'B':
             if op_sql.is_on_station(id) == value:
                 return "Charging station is already on/off.", 400
@@ -176,7 +178,34 @@ def event_request(event_type = None, id = None, value = None, charge_type = None
             else:
                 return "Charging station is off.", 200
     elif event_type == 'C':
+        if wait_list.isExist(id) == False:
+            station_id = op_sql.query_station_by_car(id)
+            if station_id is not None:
+                if charge_type != 'O' and charge_type != wait_list.getInfo(id, 'charge_type'):
+                    if value == -1:
+                        WaitingList.add(wait_list,id,wait_list.getInfo(id, 'charge_value'),charge_type)
+                    else:
+                        WaitingList.add(wait_list,id,value,charge_type)
+                    if charging_cars[station_id] is not None:
+                        charging_cars[station_id].remove(id)
+                    else:
+                        # 根据id移除cars中的车辆
+                        cars[id] = None
+                    return "Event request successful.", 200
+                else:
+                    if charging_cars[station_id] is not None:
+                        charging_cars[station_id].modify_remaining_volume(value)
+                    else:
+                        cars[id].modify_remaining_volume(value)
+
+                    
+            
+        elif value == 0:
+            WaitingList.remove(wait_list,id)
+        elif charge_type != 'O':
             WaitingList.changeInfo(wait_list,id,value,charge_type)
+        else:
+            WaitingList.changeInfo(wait_list,id,value,wait_list.getInfo(id, 'charge_type'))
 
     return "Event request successful.", 200  # 返回登录成功消息和 200 状态码
 
@@ -425,11 +454,24 @@ class TimeSystem:
 
         return total_fee
 
+    def push_event_to_wait_list(self, wait_list, current_time, event_list):
+        # event_list是一个链表，每个节点是一个事件，遍历链表，将所有event_time小于等于当前时间的事件加入等待队列
+        current_node = event_list.head
+        while current_node is not None:
+            if current_node.event_time <= current_time:
+                # add(self, car_id, charge_value, charge_mode)
+                wait_list.add(current_node.car_id, current_node.charge_value, current_node.charge_mode)
+                current_node = current_node.next
+
+        event_list.removeByTime(current_time)
+
+
     def step_forward(self):
         print(f"Step forward running in thread {threading.current_thread().name}")
         self.running = True  # 开始运行
         while self.current_time < self.end_time:
             # 正常运行的代码...
+            self.push_event_to_wait_list(wait_list, self.current_time, event_list)
             print("Before check_and_operate")
             self.check_and_operate()
             print("After check_and_operate")
@@ -456,6 +498,7 @@ class TimeSystem:
         self.running = True  # 开始运行
         while self.current_time <= self.end_time:
             print(f"Current time: {self.current_time}")
+            self.push_event_to_wait_list(wait_list, self.current_time, event_list)
             for _ in range(int(1 / self.time_unit)):
                 self.check_and_operate()
                 time.sleep(1)
@@ -493,7 +536,7 @@ def run_until():
     data = request.get_json()
     hour = data['hour']
     print(f"Running until {hour}")
-    time_system.run_time = int(hour)
+    time_system.run_time = hour
     time_system.paused = False  # 让step_forward方法重新开始运行
     if not time_system.running:
         threading.Thread(target=time_system.step_forward).start()
@@ -516,7 +559,7 @@ def set_mode():
         return jsonify({'status': 'error', 'message': 'Invalid mode'}), 400
 
 
-@app.route('/current_time')
+@app.route('/current_time', methods=['GET'])
 def current_time():
     hours, remainder = divmod(time_system.current_time, 1)
     minutes = int(remainder * 60)
