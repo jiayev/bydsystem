@@ -363,12 +363,10 @@ def switch_station_status(station_id, status):
 
 class TimeSystem:
     def __init__(self, start_time, time_unit, end_time,is_auto, step,wait_list):
-        self.pause_time = None
-        self.resume_time = None
-
         #time_unit表示时间系统的每个周期的长度如秒，分
+        self.run_time = 0
         self.paused = True
-        self.mode = "auto" #初始化时间模式
+        self.mode = "step" #初始化时间模式
         self.end_time = end_time
         self.current_time = start_time
         self.start_time = start_time
@@ -378,12 +376,13 @@ class TimeSystem:
         self.running = False  # 初始化 running 为 False
         self.wait_list = wait_list
 
-    def set_pause_and_resume_time(self, pause_time, resume_time):
-        self.pause_time = pause_time
-        self.resume_time = resume_time
-
-    def run_until(self, until_time):
-        self.pause_time = until_time
+    def run_until(self, run_time):
+        self.run_time = run_time
+        self.paused = True
+        if not self.running:
+            threading.Thread(target=self.step_forward).start()
+    def stop(self):
+        self.paused = True
 
     def update_charging_station(self, station_id, status, current_charging_car):
         # 连接到SQLite数据库
@@ -429,18 +428,11 @@ class TimeSystem:
     def step_forward(self):
         print(f"Step forward running in thread {threading.current_thread().name}")
         self.running = True  # 开始运行
-        while self.current_time <= self.end_time:
-            print(f"Current time: {self.current_time}, Pause time: {self.pause_time}, Resume time: {self.resume_time}")
-            # 如果当前时间在暂停和恢复时间之间，就暂停执行
-            if self.pause_time is not None and self.resume_time is not None and self.pause_time <= self.current_time < self.resume_time:
-                self.paused = True
-                print("Pausing...")
-                while self.paused and self.current_time < self.resume_time:
-                    time.sleep(self.time_unit)
-                self.paused = False
-                print("Resuming...")
+        while self.current_time < self.end_time:
             # 正常运行的代码...
+            print("Before check_and_operate")
             self.check_and_operate()
+            print("After check_and_operate")
             for station, cars in charging_cars.items():
                 for car in cars:
                     car.charge(self.time_unit)
@@ -452,8 +444,11 @@ class TimeSystem:
             self.current_time += self.step
             print(f"Current time in step forward: {self.current_time}")
 
+            if self.current_time >= self.run_time or self.paused:
+                self.paused = True
+                print(f"Paused at {self.run_time}")
+                break
         self.running = False  # 停止运行
-
         print('Finished step_forward method.')
 
     def auto_run(self):
@@ -493,15 +488,16 @@ class TimeSystem:
 
 
 
-# 初始化时间系统
-
-@app.route('/set_pause_and_resume_time', methods=['POST'])
-def set_pause_and_resume_time():
-    new_pause_time = request.json['pause_time']
-    new_resume_time = request.json['resume_time']
-    time_system.pause_time = new_pause_time
-    time_system.resume_time = new_resume_time
-    return jsonify({'status': 'success'})
+@app.route('/run_until', methods=['POST'])
+def run_until():
+    data = request.get_json()
+    hour = data['hour']
+    print(f"Running until {hour}")
+    time_system.run_time = int(hour)
+    time_system.paused = False  # 让step_forward方法重新开始运行
+    if not time_system.running:
+        threading.Thread(target=time_system.step_forward).start()
+    return "200"
 
 @app.route('/set_mode', methods=['POST'])
 def set_mode():

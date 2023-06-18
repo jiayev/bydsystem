@@ -9,23 +9,10 @@ response = requests.get(f'{BASE_URL}/')
 import requests
 import json
 
-def set_pause_and_resume_time(pause_time, resume_time):
-    # 设置请求的URL
-    url = 'http://localhost:5000/set_pause_and_resume_time'
-
-    # 设置请求的数据
-    data = {'pause_time': pause_time, 'resume_time': resume_time}
-
-    # 发送POST请求
-    response = requests.post(url, data=json.dumps(data), headers={'Content-Type': 'application/json'})
-
-    # 获取服务器的响应
-    response_data = response.json()
-
-    if response_data['status'] == 'success':
-        print(f'Successfully set pause time to {pause_time} and resume time to {resume_time}')
-    else:
-        print(f'Error setting pause and resume time')
+def run_until_client(until_time):
+    data = {'hour': until_time}
+    response = requests.post('http://localhost:5000/run_until', json=data)
+    print(response.status_code)
 
 def change_mode(new_mode):
     # 设置请求的URL
@@ -181,7 +168,8 @@ def main():
             print("2. Logout")
         print("3. Submit a charging request")
         print("4. View Charging Stations Usage")
-        print('5. Set pause and resume time')
+        print('5. Set pause and resume5'
+              ' time')
         print("6. Exit")
         if admin:
             print("6. Start/Stop Charging Station")
@@ -230,9 +218,8 @@ def main():
             #else:
             charging_stations_inf()
         elif option == '5':
-            pause_time = input('Enter pause time (as minutes from midnight, e.g. 360 for 06:00): ')
-            resume_time = input('Enter resume time (as minutes from midnight, e.g. 480 for 08:00): ')
-            set_pause_and_resume_time(int(pause_time), int(resume_time))
+            hour = int(input("Please input the hour to run until (0-24): "))
+            run_until_client(hour)
         elif option == "6":
             print("Exiting... Thank you!")
             break
