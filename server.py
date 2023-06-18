@@ -5,7 +5,7 @@ import waitinglist
 from waitinglist import WaitingList
 from waitinglist import WaitingNode
 from sqlite3 import Error
-from flask import Flask, request, g
+from flask import Flask, request, jsonify
 import threading
 from models import datetime, ChargingCar
 import queue
@@ -15,13 +15,13 @@ app = Flask(__name__)
 wait_list = WaitingList()
 #时间
 # 全局的充电车辆列表
-charging_cars = {"A": ChargingCar, "B": ChargingCar, "C": ChargingCar, "D": ChargingCar, "E": ChargingCar}
+charging_cars = {"A": [], "B": [], "C": [], "D": [], "E": []}
 # 设定开始时间，结束时间，时间单位，是否自动运行，和step
 start_time = 0
 end_time = 24
 # 时间系统从0小时开始，每个时间步为0.5小时，结束于24小时，自动运行
 time_unit = 0.5
-is_auto = False
+is_auto = True
 step = 1
 
 charging_requests = {}
@@ -46,15 +46,15 @@ stop_charging_cars = threading.Event()
 
 
 
-def display_charging_cars():
-    while not stop_charging_cars.is_set():
-        for id, car in charging_cars.items():
-            print(f"Car ID: {id}")
-            print(f"Required charge: {charging_requests[id]['charging_volume']}")
-            print(f"Charged so far: {car['charged_volume']}")
-            print(f"Charging mode: {charging_requests[id]['charging_mode']}")
-            print()
-        time.sleep(5)  # 每5秒打印一次
+# def display_charging_cars():
+#     while not stop_charging_cars.is_set():
+#         for id, car in charging_cars.items():
+#             print(f"Car ID: {id}")
+#             print(f"Required charge: {charging_requests[id]['charging_volume']}")
+#             print(f"Charged so far: {car['charged_volume']}")
+#             print(f"Charging mode: {charging_requests[id]['charging_mode']}")
+#             print()
+#         time.sleep(5)  # 每5秒打印一次
 
 def create_account_table():
     conn = sqlite3.connect('accounts.db')
@@ -71,7 +71,7 @@ def create_account_table():
 def get_current_time():
     return time_system.current_time, 200
 
-@app.before_first_request
+
 def setup():
     op_sql.turn_on_all_charging_station()
     print("All charging stations are on.\n")
@@ -413,37 +413,41 @@ class TimeSystem:
         total_fee = charging_fee + service_fee
 
         return total_fee
-    
+
     def step_forward(self):
         while self.current_time <= self.end_time:
             self.check_and_operate()
-            for station_id, car in list(charging_cars.items()):  # 遍历复制的字典，以防在迭代过程中改变字典
-                car.charge(time_unit)
-                self.calculate_fee()
-                car.add_to_bill()
-                if car.is_charged():  # 如果车辆已经充电完成
-                    del charging_cars[station_id]  # 从正在充电的车辆字典中移除
-                    self.update_charging_station(car.station_id, 'free', None)  # 将充电站状态更新为'free'
-                    # 这里可以添加更多的清理工作，如更新数据库等
+            for station, cars in charging_cars.items():
+                for car in cars:
+                    car.charge(self.time_unit)
+                    self.calculate_fee()
+                    car.add_to_bill()
+                    if car.is_charged():  # 如果车辆已经充电完成
+                        cars.remove(car)  # 从正在充电的车辆列表中移除
+                        self.update_charging_station(station, 'free', None)  # 将充电站状态更新为'free'
             self.current_time += self.step
             if not self.is_auto:
                 break
 
     def auto_run(self):
-        while self.current_time <= self.end_time:
-            for _ in range(int(1 / self.time_unit)):  # 这个循环会使得check_and_operate每秒运行一次
-                self.check_and_operate()
-                time.sleep(1)  # 暂停一秒
-            for station_id, car in list(charging_cars.items()):  # 遍历复制的字典，以防在迭代过程中改变字典
-                car.charge(time_unit)
-                self.calculate_fee()
-                car.add_to_bill()
-                if car.is_charged():  # 如果车辆已经充电完成
-                    del charging_cars[station_id]  # 从正在充电的车辆字典中移除
-                    self.update_charging_station(car.station_id, 'free', None)  # 将充电站状态更新为'free'
-                    # 这里可以添加更多的清理工作，如更新数据库等
-            self.current_time += self.step
-            time.sleep(self.time_unit)  # 假设time_unit以秒为单位
+        def run_loop():
+            while self.current_time <= self.end_time:
+                for _ in range(int(1 / self.time_unit)):
+                    self.check_and_operate()
+                    time.sleep(1)
+                for station, cars in charging_cars.items():
+                    for car in cars:
+                        car.charge(self.time_unit)
+                        self.calculate_fee()
+                        car.add_to_bill()
+                        if car.is_charged():  # 如果车辆已经充电完成
+                            cars.remove(car)  # 从正在充电的车辆列表中移除
+                            self.update_charging_station(station, 'free', None)  # 将充电站状态更新为'free'
+                self.current_time += self.step
+                time.sleep(self.time_unit)
+
+        thread = threading.Thread(target=run_loop)
+        thread.start()
 
     def check_and_operate(self):
         # 在这里添加每个时间单位开始时进行的检查和操作
@@ -455,7 +459,7 @@ class TimeSystem:
 
 # 初始化时间系统
 time_system = TimeSystem(start_time, time_unit, end_time, is_auto, step, wait_list)
-
+time_system.auto_run()
 
 
 # 开始时间系统
@@ -472,14 +476,24 @@ if time_system.is_auto:
 else:
     time_system.step_forward()
 
+
+
+
+
+@app.route('/current_time')
+def current_time():
+    hours, remainder = divmod(time_system.current_time, 1)
+    minutes = int(remainder * 60)
+    return jsonify({'current_time': f'{int(hours):02d}:{minutes:02d}'})
+
 if __name__ == '__main__':
-   
+    app.run(port=5000, debug=True)
     # WaitingList.add(wait_list, 'lv1', 12, 'F')
     # WaitingList.add(wait_list, 'lv2', 13, 'T')
     # wait_list.print()
     # wait_list.getFirstFast().print()
     # wait_list.getFirstSlow().print()
-    app.run(port=5000, debug=True)
-   
-    
+
+
+
     print_all_accounts()
