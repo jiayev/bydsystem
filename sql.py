@@ -65,7 +65,7 @@ def create_charging_stations_table():
          bill_id TEXT PRIMARY KEY,
          bill_time TEXT,
          charge_sum TEXT,
-         chatge_time TEXT,
+         charge_time TEXT,
          start_time TEXT,
          end_time TEXT,
          charge_fee TEXT,
