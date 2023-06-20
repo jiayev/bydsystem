@@ -1,6 +1,6 @@
 import sqlite3
 
-#--------------------------------------------------------------------------------------------------------------------------------#
+#------------------------------------------------------充电桩相关---------------------------------------------------------------------#
 def query_station_all():
     #这个我只写了查询所有
     conn = sqlite3.connect('charging_stations.db')
@@ -117,7 +117,7 @@ def turn_on_all_charging_station():
     conn.commit()
     conn.close()
 
-#---------------------------------------------------------------------------------------------------------------------------#
+#-------------------------------------------------------事件相关--------------------------------------------------------------------#
 
 def query_event_all():
     conn = sqlite3.connect('charging_stations.db')
@@ -152,7 +152,7 @@ def update_event(event_id, event_type, charge_type, event_value, event_time):
     conn.close()
 
 
-#-------------------------------------------------------------------------------------------------------------------#
+#--------------------------------------------------队列相关-----------------------------------------------------------------#
 
 def query_queue_all():
     conn = sqlite3.connect('charging_stations.db')
@@ -185,9 +185,9 @@ def update_wait_queue(queue_id, queue_value, queue_type, queue_order):
     conn.commit()
     conn.close()
 
-#-------------------------------------------------------------------------------------------------------------------#
+#------------------------------------------------详单相关-------------------------------------------------------------------#
 
-def query_queue_all():
+def query_detail_all():
     conn = sqlite3.connect('charging_stations.db')
     cursor = conn.execute('SELECT * FROM detail_bill')
     for row in cursor:
@@ -238,6 +238,77 @@ def update_detail_bill(detail_id, car_id, detail_time, charge_id, charge_sum, ch
     conn.commit()
     conn.close()
 
+def get_detail_list(car_id):
+    #按car_id分组并把每组的detail_id合并成list，用于更新账单的detail_list
+    conn = sqlite3.connect('charging_stations.db')
+    c = conn.cursor()
+    sql = 'SELECT detail_id FROM detail_bill WHERE car_id=?'
+    c.execute(sql, (car_id,))
+    rows = c.fetchall()
+    conn.close()
+    
+    detail_list = []
+    for row in rows:
+        detail_list.append(row[0])
+    return detail_list
+
+def sum_charge(car_id):
+    #获得充电量的总和，用于更新账单
+    conn = sqlite3.connect('charging_stations.db')
+    c = conn.cursor()
+    sql = 'SELECT charge_sum FROM detail_bill WHERE car_id=?'
+    c.execute(sql, (car_id,))
+    rows = c.fetchall()
+    conn.close()
+    
+    total_charge = 0
+    for row in rows:
+        total_charge += row[0]
+    return total_charge
+
+def sum_charge_fee(car_id):
+    #获得电费的总和，用于更新账单
+    conn = sqlite3.connect('charging_stations.db')
+    c = conn.cursor()
+    sql = 'SELECT charge_fee FROM detail_bill WHERE car_id=?'
+    c.execute(sql, (car_id,))
+    rows = c.fetchall()
+    conn.close()
+    
+    total_charge_fee = 0
+    for row in rows:
+        total_charge_fee += row[0]
+    return total_charge_fee
+
+
+def sum_server_fee(car_id):
+    #获得服务费的总和，用于更新账单
+    conn = sqlite3.connect('charging_stations.db')
+    c = conn.cursor()
+    sql = 'SELECT server_fee FROM detail_bill WHERE car_id=?'
+    c.execute(sql, (car_id,))
+    rows = c.fetchall()
+    conn.close()
+    
+    total_server_fee = 0
+    for row in rows:
+        total_server_fee += row[0]
+    return total_server_fee
+
+def sum_total_fee(car_id):
+
+    conn = sqlite3.connect('charging_stations.db')
+    c = conn.cursor()
+    sql = 'SELECT total_fee FROM detail_bill WHERE car_id=?'
+    c.execute(sql, (car_id,))
+    rows = c.fetchall()
+    conn.close()
+    
+    total_fee_sum = 0
+    for row in rows:
+        total_fee_sum += row[0]
+        
+    return total_fee_sum
 #---------------------------------------------------------------------------------------------------------#
 def insert_bill(car_id, bill_id, bill_time, charge_sum, charge_time, start_time, end_time, 
                 charge_fee, server_fee, total_fee, detail_list):
@@ -257,71 +328,53 @@ def delete_bill_by_id(bill_id):
     conn.commit()
     conn.close()
 
-def sum_charge(car_id):
-    #获得充电量的总和
+def get_bill_count():
+    #统计行数，用来生成账单编号
     conn = sqlite3.connect('charging_stations.db')
     c = conn.cursor()
-    sql = 'SELECT charge_sum FROM bill WHERE car_id=?'
-    c.execute(sql, (car_id,))
-    rows = c.fetchall()
+    sql = 'SELECT COUNT(*) FROM bill'
+    c.execute(sql)
+    row_count = c.fetchone()[0]
     conn.close()
     
-    total_charge = 0
-    for row in rows:
-        total_charge += row[0]
-    return total_charge
+    return row_count
 
-def sum_charge_fee(car_id):
-    #获得电费的总和
+def car_id_exists(car_id):
+    #判断某个car_id是否存在
+    ##我来说一下我想象中的逻辑：1.在一辆车完成一次充电后新建一个箱单数据，然后查询这辆车有没有对应的账单（用这个函数）##
+    ##                        2.如果没有就新建一个账单，如果有就根据现在新的详单更新账单                          ##
+    ##                        3.上面的get_detail_list，sum_charge，sum_charge_fee，sum_server_fee之类的函数就是用来干这个的  ##
     conn = sqlite3.connect('charging_stations.db')
     c = conn.cursor()
-    sql = 'SELECT charge_fee FROM bill WHERE car_id=?'
+    sql = 'SELECT 1 FROM bill WHERE car_id=?'
     c.execute(sql, (car_id,))
-    rows = c.fetchall()
+    row = c.fetchone()
     conn.close()
     
-    total_charge_fee = 0
-    for row in rows:
-        total_charge_fee += row[0]
-    return total_charge_fee
+    return row != None
 
-def sum_charge_fee(car_id):
-    #充电费
+def update_bill(car_id,  bill_time, charge_sum, charge_fee, server_fee, total_fee, detail_list):
     conn = sqlite3.connect('charging_stations.db')
     c = conn.cursor()
-    sql = 'SELECT charge_fee FROM bill WHERE car_id=?'
-    c.execute(sql, (car_id,))
-    rows = c.fetchall()
+    sql = 'UPDATE bill SET bill_time=?, charge_sum=?, charge_fee=?, server_fee=?, total_fee=?, detail_list=? WHERE car_id=?'
+    c.execute(sql, ( bill_time, charge_sum,charge_fee, server_fee, total_fee, detail_list, car_id))  
+    conn.commit()
     conn.close()
-    
-    total_charge_fee = 0
-    for row in rows:
-        total_charge_fee += row[0]
-    return total_charge_fee
 
-def sum_server_fee(car_id):
-    #获得服务费的总和
-    conn = sqlite3.connect('charging_stations.db')
-    c = conn.cursor()
-    sql = 'SELECT server_fee FROM bill WHERE car_id=?'
-    c.execute(sql, (car_id,))
-    rows = c.fetchall()
-    conn.close()
-    
-    total_server_fee = 0
-    for row in rows:
-        total_server_fee += row[0]
-    return total_server_fee
+def get_all_bill():
+    #查询
+    #这个函数这样用：
+    #  bills = get_all_bill()
+    #  for bill in bills:
+    #   print(bill, end = '\n')
 
-def get_detail_list(car_id):
     conn = sqlite3.connect('charging_stations.db')
     c = conn.cursor()
-    sql = 'SELECT detail_list FROM bill WHERE car_id=?'
-    c.execute(sql, (car_id,))
+    sql = 'SELECT * FROM bill'
+    c.execute(sql)
     rows = c.fetchall()
     conn.close()
     
-    detail_list = []
-    for row in rows:
-        detail_list.append(row[0])
-    return detail_list
+    return rows 
+
+
