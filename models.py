@@ -1,8 +1,7 @@
 import datetime
 import queue
-
-
-
+import op_sql
+from Timesys import time_system
 
 class ChargingStation:
     def __init__(self, id, power, capacity):
@@ -23,7 +22,10 @@ class ChargingStation:
 
 class ChargingCar:
     SERVICE_FEE = 0.8
-    def __init__(self, car_id, charging_volume, charging_mode, is_charging=False):
+    def __init__(self,charge_start_time, car_id, charging_volume, charging_mode,  is_charging=False):
+        
+        self.charge_start_time = charge_start_time
+
         self.car_id = car_id
         # 车辆的待充电量
         self.charging_volume = charging_volume
@@ -61,11 +63,44 @@ class ChargingCar:
             self.charging_volume -= charge_this_unit
             self.charged_volume += charge_this_unit
 
+    def calculate_fee(self):
+        current_hour = time_system.current_time
+        # 判断当前时间属于哪个电价区间
+        if 10 <= current_hour < 15 or 18 <= current_hour < 21:
+            unit_price = 1.0  # 峰时电价
+        elif 7 <= current_hour < 10 or 15 <= current_hour < 18 or 21 <= current_hour < 23:
+            unit_price = 0.7  # 平时电价
+        else:
+            unit_price = 0.4  # 谷时电价
 
+        # 充电费=单位电价*充电度数
+        charging_fee = unit_price * self.charged_volume
+
+        # 服务费=服务费单价*充电度数
+        service_fee = self.SERVICE_FEE * self.charged_volume
+
+        # 总费用=充电费+服务费
+        total_fee = charging_fee + service_fee
+
+        return total_fee
     def is_charged(self):
         return self.charging_volume == 0
 
+    def get_id(self):
+        return self.car_id
+    
+    def get_start_time(self):
+        return self.charge_start_time
+
+    def get_volume(self):
+        return self.charged_volume
+    
+    def get_mode(self):
+        return self.charging_mode
+    
+    
     def add_to_bill(self):
+   
         # 在这里添加将费用添加到详单的逻辑
         pass
 
