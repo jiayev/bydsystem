@@ -492,8 +492,27 @@ class TimeSystem:
                         detail_total = car.calculate_fee()
                         detail_server_fee = 0.8 * car.get_volume()
                         detail_charge_fee = detail_total - detail_server_fee
-                        op_sql.insert_detail_bill(detail_car_id, detail_count, 'A',detail_volume, detail_charge_time, detail_start_time, detail_end_time, detail_charge_fee, detail_server_fee, detail_total)
+                        op_sql.insert_detail_bill(detail_count, detail_car_id,detail_time, 'A', detail_volume,detail_charge_time, detail_start_time, detail_end_time, detail_charge_fee, detail_server_fee, detail_total)
                         #----------------------------------------------------------------------------------------------# 
+                        if op_sql.car_id_exists: #如果已经存在账单
+                            bill_time = current_time
+                            bill_charge_sum = op_sql.sum_charge(car.get_id())
+                            bill_charge_fee = op_sql.sum_charge_fee(car.get_id())
+                            bill_server_fee = op_sql.sum_server_fee(car.get_id())
+                            bill_total_fee = op_sql.sum_total_fee(car.get_id())
+                            current_list = op_sql.get_detail_list(car.get_id())
+                            new_list = ''
+                            for detail in current_list:
+                                new_list += detail + ' '
+                            
+                            op_sql.update_bill(detail_car_id, bill_time, bill_charge_sum, bill_charge_fee, bill_server_fee, bill_total_fee, new_list )
+                        else: 
+                            bill_time = current_time
+                            bill_count = op_sql.get_bill_count + 1
+
+                            op_sql.insert_bill(detail_car_id, bill_count,bill_time, detail_volume, detail_charge_time, detail_start_time, detail_end_time, detail_charge_fee, detail_server_fee, detail_total, detail_count)
+                            
+
                         cars.remove(car)  # 从正在充电的车辆列表中移除
                         self.update_charging_station(station, 'free', None)  # 将充电站状态更新为'free'
             self.current_time += self.step
