@@ -108,7 +108,7 @@ def get_bill(username):
 
 def apply_event(event_type, event_time, car_id, charge_value, charge_mode):
     response = requests.post(f'{BASE_URL}/apply_event', data={'event_type': event_type, 'event_time': event_time, 'car_id': car_id, 'charge_value': charge_value, 'charge_mode': charge_mode})
-    print(response.json()['message'])
+    print(response)
 
 # 启动充电桩
 def start_charger(charger_id):

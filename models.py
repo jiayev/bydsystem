@@ -1,7 +1,6 @@
 import datetime
 import queue
 import op_sql
-from Timesys import time_system
 
 class ChargingStation:
     def __init__(self, id, power, capacity):
