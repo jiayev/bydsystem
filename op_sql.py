@@ -213,7 +213,7 @@ def count_detail_rows():
     return row_count
 
 def find_by_car_id(car_id):
-    #通过car_id查找
+    #通过car_id查找详单
     conn = sqlite3.connect('charging_stations.db')
     c = conn.cursor()
     c.execute('SELECT * FROM detail_bill WHERE car_id=?', (car_id,))
@@ -237,3 +237,91 @@ def update_detail_bill(detail_id, car_id, detail_time, charge_id, charge_sum, ch
               (car_id, detail_time, charge_id, charge_sum, chatge_time, start_time, end_time, charge_fee, server_fee, total_fee, detail_id))
     conn.commit()
     conn.close()
+
+#---------------------------------------------------------------------------------------------------------#
+def insert_bill(car_id, bill_id, bill_time, charge_sum, charge_time, start_time, end_time, 
+                charge_fee, server_fee, total_fee, detail_list):
+    conn = sqlite3.connect('charging_stations.db')
+    c = conn.cursor()
+    c.execute('INSERT INTO bill (car_id, bill_id, bill_time, charge_sum, charge_time, start_time, end_time, charge_fee, server_fee, total_fee, detail_list) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 
+              (car_id, bill_id, bill_time, charge_sum, charge_time, start_time, end_time, 
+               charge_fee, server_fee, total_fee, detail_list))
+    conn.commit()
+    conn.close()
+
+def delete_bill_by_id(bill_id):
+    conn = sqlite3.connect('charging_stations.db')
+    c = conn.cursor()
+    sql = 'DELETE FROM bill WHERE bill_id=?'
+    c.execute(sql, (bill_id,))
+    conn.commit()
+    conn.close()
+
+def sum_charge(car_id):
+    #获得充电量的总和
+    conn = sqlite3.connect('charging_stations.db')
+    c = conn.cursor()
+    sql = 'SELECT charge_sum FROM bill WHERE car_id=?'
+    c.execute(sql, (car_id,))
+    rows = c.fetchall()
+    conn.close()
+    
+    total_charge = 0
+    for row in rows:
+        total_charge += row[0]
+    return total_charge
+
+def sum_charge_fee(car_id):
+    #获得电费的总和
+    conn = sqlite3.connect('charging_stations.db')
+    c = conn.cursor()
+    sql = 'SELECT charge_fee FROM bill WHERE car_id=?'
+    c.execute(sql, (car_id,))
+    rows = c.fetchall()
+    conn.close()
+    
+    total_charge_fee = 0
+    for row in rows:
+        total_charge_fee += row[0]
+    return total_charge_fee
+
+def sum_charge_fee(car_id):
+    #充电费
+    conn = sqlite3.connect('charging_stations.db')
+    c = conn.cursor()
+    sql = 'SELECT charge_fee FROM bill WHERE car_id=?'
+    c.execute(sql, (car_id,))
+    rows = c.fetchall()
+    conn.close()
+    
+    total_charge_fee = 0
+    for row in rows:
+        total_charge_fee += row[0]
+    return total_charge_fee
+
+def sum_server_fee(car_id):
+    #获得服务费的总和
+    conn = sqlite3.connect('charging_stations.db')
+    c = conn.cursor()
+    sql = 'SELECT server_fee FROM bill WHERE car_id=?'
+    c.execute(sql, (car_id,))
+    rows = c.fetchall()
+    conn.close()
+    
+    total_server_fee = 0
+    for row in rows:
+        total_server_fee += row[0]
+    return total_server_fee
+
+def get_detail_list(car_id):
+    conn = sqlite3.connect('charging_stations.db')
+    c = conn.cursor()
+    sql = 'SELECT detail_list FROM bill WHERE car_id=?'
+    c.execute(sql, (car_id,))
+    rows = c.fetchall()
+    conn.close()
+    
+    detail_list = []
+    for row in rows:
+        detail_list.append(row[0])
+    return detail_list
