@@ -256,7 +256,7 @@ def add_charging_car(waiting_list):
                 current_charging_car = cars[current_waiting_car]  # 从字典中获取车辆对象
                 del cars[current_waiting_car]  # 从字典中移除该车辆
                 car_id, charge_value, charge_mode = current_charging_car.getInfo()
-                new_car = ChargingCar(car_id, charge_value, charge_mode, is_charging=True)
+                new_car = ChargingCar(current_time ,car_id, charge_value, charge_mode, is_charging=True)
 
                 # 将车辆添加到充电站
                 charging_cars[station_id].append(new_car)
@@ -276,7 +276,7 @@ def add_charging_car(waiting_list):
                     waiting_list.remove(car_node.car_id)
                     current_charging_car = car_node
                     car_id, charge_value, charge_mode = current_charging_car.getInfo()
-                    new_car = ChargingCar(car_id, charge_value, charge_mode, is_charging=True)
+                    new_car = ChargingCar(current_time, car_id, charge_value, charge_mode, is_charging=True)
 
                     # 将车辆添加到充电站
                     charging_cars[station_id].append(new_car)
@@ -481,6 +481,19 @@ class TimeSystem:
                     self.calculate_fee()
                     car.add_to_bill()
                     if car.is_charged():  # 如果车辆已经充电完成
+                          #---------------------------------创建新详单----------------------------------------------------#
+                        detail_count = op_sql.count_detail_rows + 1 #详单编号
+                        detail_time = self.current_time #生成时间
+                        detail_volume = car.get_volume()
+                        detail_car_id = car.get_id()
+                        detail_end_time = detail_time #结束时间
+                        detail_start_time = car.get_start_time()
+                        detail_charge_time = detail_end_time - detail_start_time
+                        detail_total = car.calculate_fee()
+                        detail_server_fee = 0.8 * car.get_volume()
+                        detail_charge_fee = detail_total - detail_server_fee
+                        op_sql.insert_detail_bill(detail_car_id, detail_count, 'A',detail_volume, detail_charge_time, detail_start_time, detail_end_time, detail_charge_fee, detail_server_fee, detail_total)
+                        #----------------------------------------------------------------------------------------------# 
                         cars.remove(car)  # 从正在充电的车辆列表中移除
                         self.update_charging_station(station, 'free', None)  # 将充电站状态更新为'free'
             self.current_time += self.step
